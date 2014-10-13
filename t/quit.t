@@ -15,53 +15,54 @@ my %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
-  isa_ok $client, 'AnyEvent::MySQL::Client';
-  done $c;
-} n => 1, name => 'new';
-
-test {
-  my $c = shift;
-
-  my $client = AnyEvent::MySQL::Client->new;
   $client->connect
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_query (q{create table foo (id int, unique key (id))}, sub {});
+    return $client->send_quit;
   })->then (sub {
-    return $client->send_query (q{insert into foo (id) values (12)}, sub {});
-  })->then (sub {
-    my @row;
-    return $client->send_query (q{select id from foo}, sub {
-      push @row, $_[0];
-    })->then (sub { return $row[0]->[1]->{data}->[0] });
-  })->then (sub {
-    my $result = $_[0];
-    return $client->send_quit->then (sub { return $result });
-  })->catch (sub {
-    my $error = $_[0];
     test {
-      ok 0;
-      is $error, undef;
+      ok 1;
     } $c;
-  })->then (sub {
-    my $result = $_[0];
-    return $client->disconnect->then (sub { return $result });
-  })->catch (sub {
+  }, sub {
     test {
       ok 0;
     } $c;
-    return undef;
+  })->then (sub {
+    return $client->send_ping;
   })->then (sub {
     my $result = $_[0];
     test {
-      is $result, 12, 'result value';
+      ok not $result;
       done $c;
       undef $c;
       undef $client;
     } $c;
   });
-} n => 1;
+} n => 2, name => 'after connect';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->send_quit->then (sub {
+    test {
+      ok 1;
+    } $c;
+  }, sub {
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    return $client->send_ping;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      ok not $result;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 2, name => 'before connect';
 
 run_tests;
 

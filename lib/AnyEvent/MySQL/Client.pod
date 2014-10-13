@@ -1,0 +1,72 @@
+XXX
+
+Following methods are available.
+
+=over 4
+
+=item $client = AnyEvent::MySQL::Client->new
+
+Create a new instance of the MySQL client class.
+
+=item $promise = $client->connect (OPTIONS)
+
+Connect to the specified MySQL server.  It returns a promise, which is
+resolved when the client object is ready to accept subsequential
+commands.  The promise is rejected if it fails to connect to the
+server.
+
+Following name/value pairs must be specified as options:
+
+=over 4
+
+=item hostname => $string
+
+The ASCII hostname of the server.
+
+=item port => $integer
+
+The port number of the server.
+
+=item username => $string
+
+The user name for the authorization, if necessary.
+
+=item password => $string
+
+The password for the authorization, if necessary.
+
+=item database => $string
+
+The database name to connect.
+
+=back
+
+Please note that, once connected, the C<disconnect> method of the
+client object must be invoked before the client object is discarded
+such that the connection to the server is grecefully closed.
+
+=item $promise = $client->disconnect
+
+Disconect the connection to the MySQL server, if any.  It returns a
+promise, which is resolved when the connection is closed.  If there is
+no connection, the promise is immediately resolved.  That is, this
+method might be invoked even when there is no connection.
+
+=item $promise = $client->send_quit
+
+Send a C<COM_QUIT> command, which will let the server close the
+connection.  It returns a promise, which is resolved when the
+connection is closed.  If there is no connection, the promise is
+immediately resolved.  That is, this method might be invoked even when
+there is no connection.
+
+=item $promise = $client->send_ping
+
+Send a C<COM_PING> command.  It returns a promise, which is resolved
+with a true value when the server responds to the command.  If the
+server does not return a response, or if there is no connection, the
+promise is resolved with a false value.
+
+=back
+
+XXX

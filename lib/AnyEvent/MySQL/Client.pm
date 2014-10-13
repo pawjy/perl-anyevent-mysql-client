@@ -20,6 +20,7 @@ use AnyEvent::MySQL::Client::Promise;
 # XXX new_from_dsn
 # XXX new_from_url
 # XXX transaction
+# XXX docs
 
 ## Capability flags
 ## <http://dev.mysql.com/doc/internals/en/capability-flags.html>.
@@ -52,6 +53,7 @@ sub OK_Packet  () { 0x00 }
 sub ERR_Packet () { 0xFF }
 sub EOF_Packet () { 0xFE }
 
+# XXX
 sub connection_packet_timeout () { 10 }
 sub query_packet_timeout () { 60 }
 
@@ -82,7 +84,7 @@ sub connect ($%) {
   $self->{close_promise} = $promise_close;
 
   $self->{handle} = AnyEvent::Handle->new
-      (connect => [$args{host}, $args{port}],
+      (connect => [$args{hostname}, $args{port}],
        on_connect => sub {
          my ($hdl) = @_;
          $ok->($hdl);
@@ -169,8 +171,8 @@ sub connect ($%) {
     $response->_int4 (0x1_000000);
     $response->_int1 ($packet->{character_set});
     $response->_null (23);
-    $response->_string_null (defined $args{username} ? $args{username} : '');
-    my $password = defined $args{password} ? $args{password} : '';
+    $response->_string_null (defined $args{username} ? $args{username} : ''); # XXX charset
+    my $password = defined $args{password} ? $args{password} : ''; # XXX charset
     if (length $password) {
       my $stage1_hash = sha1 ($password);
       $password = sha1 ($packet->{auth_plugin_data} . sha1 ($stage1_hash)) ^ $stage1_hash;
@@ -184,7 +186,7 @@ sub connect ($%) {
       $response->_string_null ($password);
     }
     if ($self->{capabilities} & CLIENT_CONNECT_WITH_DB) {
-      $response->_string_null (defined $args{database} ? $args{database} : '');
+      $response->_string_null (defined $args{database} ? $args{database} : ''); # XXX charset
     }
     #if ($self->{capabilities} & CLIENT_PLUGIN_AUTH) {
     #  $response->_string_null ('(auth plugin name)');
@@ -272,7 +274,7 @@ sub send_ping ($) {
   })->then (sub { return 1 }, sub { $self->_close_connection; return 0 });
 } # send_ping
 
-sub send_query ($$$) {
+sub send_query ($$;$) {
   my ($self, $query, $on_row) = @_;
   return AnyEvent::MySQL::Client::Promise->new
       (sub { $_[1]->("Not connected") })
@@ -280,7 +282,7 @@ sub send_query ($$$) {
   $self->{command_promise} = $self->{command_promise}->then (sub {
     my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
     $packet->_int1 (COM_QUERY);
-    $packet->_string_eof (_b $query);
+    $packet->_string_eof (defined $query ? _b $query : '');
     $packet->_end;
     $self->_push_send_packet ($packet);
     return $self->_push_read_packet
@@ -355,7 +357,7 @@ sub send_query ($$$) {
               push @{$packet->{data}}, delete $packet->{_data};
             }
             $packet->_end;
-            $on_row->([\@column, $packet]); # XXX
+            $on_row->([\@column, $packet]) if defined $on_row; # XXX
             return $read_row_code->();
           } elsif ($packet->{header} == OK_Packet or
                    $packet->{header} == EOF_Packet) {
