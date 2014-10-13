@@ -19,6 +19,13 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
+    my $result = $_[0];
+    test {
+      ok $result;
+      isa_ok $result, 'AnyEvent::MySQL::Client::Result';
+      ok $result->is_success;
+      isa_ok $result->packet, 'AnyEvent::MySQL::Client::ReceivedPacket';
+    } $c;
     return $client->send_query (q{create table foo (id int, unique key (id))}, sub {});
   })->then (sub {
     return $client->send_query (q{insert into foo (id) values (12)}, sub {});
@@ -54,7 +61,37 @@ test {
       undef $client;
     } $c;
   });
-} n => 1, name => 'reconnect';
+} n => 5, name => 'reconnect';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->disconnect->then (sub {
+      my $y = $_[0];
+      test {
+        ok $y;
+        isa_ok $y, 'AnyEvent::MySQL::Client::Result';
+        ok $y->is_success;
+      } $c;
+    });
+  })->catch (sub {
+    test {
+      ok 0;
+    } $c;
+    return undef;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'disconnect';
 
 test {
   my $c = shift;
@@ -69,7 +106,9 @@ test {
          database => $dsn{dbname})->catch (sub {
       my $result = $_[0];
       test {
-        ok $result;
+        isa_ok $result, 'AnyEvent::MySQL::Client::Result';
+        ok $result->is_exception;
+        ok $result->message;
       } $c;
     });
   })->then (sub {
@@ -93,7 +132,7 @@ test {
       undef $client;
     } $c;
   });
-} n => 2, name => 'connect while connecting';
+} n => 4, name => 'connect while connecting';
 
 test {
   my $c = shift;
@@ -126,6 +165,99 @@ test {
     } $c;
   });
 } n => 1, name => 'with no database name';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'dummy.localdomain', port => 1122224)->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      isa_ok $x, 'AnyEvent::MySQL::Client::Result';
+      ok $x->is_exception;
+      ok $x->message;
+    } $c;
+    return $client->disconnect->then (sub {
+      my $y = $_[0];
+      test {
+        ok $y;
+        isa_ok $y, 'AnyEvent::MySQL::Client::Result';
+        ok $y->is_success;
+      } $c;
+    });
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 6, name => 'bad host';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => rand,
+       database => $dsn{dbname})->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      isa_ok $x, 'AnyEvent::MySQL::Client::Result';
+      ok $x->is_exception;
+      isa_ok $x->packet, 'AnyEvent::MySQL::Client::ReceivedPacket';
+      ok $x->message;
+      is ''.$x, $x->message;
+    } $c;
+    return $client->disconnect->then (sub {
+      my $y = $_[0];
+      test {
+        ok $y;
+        isa_ok $y, 'AnyEvent::MySQL::Client::Result';
+        ok $y->is_success;
+      } $c;
+    });
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 8, name => 'bad password';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->disconnect->then (sub {
+    my $y = $_[0];
+    test {
+      ok $y;
+      isa_ok $y, 'AnyEvent::MySQL::Client::Result';
+      ok $y->is_success;
+    } $c;
+  })->catch (sub {
+    test {
+      ok 0;
+    } $c;
+    return undef;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'disconnect not connected';
 
 run_tests;
 

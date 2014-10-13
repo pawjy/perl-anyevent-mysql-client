@@ -61,6 +61,10 @@ sub _b ($) {
   return utf8::is_utf8 ($_[0]) ? encode ('utf-8', $_[0]) : $_[0];
 } # _b
 
+sub _x ($) {
+  return bless {is_exception => 1, message => $_[0]}, __PACKAGE__ . '::Result';
+} # _x
+
 sub new ($) {
   my $class = shift;
   return bless {}, $class;
@@ -68,15 +72,9 @@ sub new ($) {
 
 sub connect ($%) {
   my ($self, %args) = @_;
-
-  my ($ok, $ng);
-  my $promise = AnyEvent::MySQL::Client::Promise->new
-      (sub { ($ok, $ng) = @_ });
-
-  if (defined $self->{connect_promise}) {
-    $ng->("|connect| is already invoked");
-    return $promise;
-  }
+  return AnyEvent::MySQL::Client::Promise->reject
+      (_x "There is a connection")
+          if defined $self->{connect_promise};
 
   my ($ok_close, $ng_close);
   my $promise_close = AnyEvent::MySQL::Client::Promise->new
@@ -86,32 +84,45 @@ sub connect ($%) {
   $self->{handle} = AnyEvent::Handle->new
       (connect => [$args{hostname}, $args{port}],
        on_connect => sub {
-         my ($hdl) = @_;
-         $ok->($hdl);
+         #
        },
        on_connect_error => sub {
          my ($hdl, $msg) = @_;
-         $ng_close->($msg);
+         $hdl->destroy;
+         if (defined $self->{on_eof}) {
+           $self->{on_eof}->(_x $msg);
+           $ok_close->(bless {is_success => 1}, __PACKAGE__ . '::Result');
+         } else {
+           $ng_close->(_x $msg);
+         }
+         delete $self->{handle};
+         delete $self->{connect_promise};
+         delete $self->{command_promise};
+         delete $self->{close_promise};
        },
        on_error => sub {
          my ($hdl, $fatal, $msg) = @_;
          $hdl->destroy;
-         $ng_close->($msg);
+         if (defined $self->{on_eof}) {
+           $self->{on_eof}->(_x $msg);
+           $ok_close->(bless {is_success => 1}, __PACKAGE__ . '::Result');
+         } else {
+           $ng_close->(_x $msg);
+         }
          delete $self->{handle};
          delete $self->{connect_promise};
          delete $self->{command_promise};
          delete $self->{close_promise};
-         $self->{on_eof}->() if defined $self->{on_eof};
        },
        on_eof => sub {
          my ($hdl) = @_;
          $hdl->destroy;
-         $ok_close->();
+         $self->{on_eof}->() if defined $self->{on_eof};
+         $ok_close->(bless {is_success => 1}, __PACKAGE__ . '::Result');
          delete $self->{handle};
          delete $self->{connect_promise};
          delete $self->{command_promise};
          delete $self->{close_promise};
-         $self->{on_eof}->() if defined $self->{on_eof};
        });
 
   my ($ok_command, $ng_command);
@@ -125,8 +136,10 @@ sub connect ($%) {
     $packet->_int (1 => 'version');
     unless ($packet->{version} == 0x0A) {
       $self->_close_connection;
-      # XXX
-      die sprintf 'Protocol version %02X not supported', $packet->{version};
+      die bless {is_exception => 1,
+                 packet => $packet,
+                 message => sprintf 'Protocol version %02X not supported',
+                     $packet->{version}}, __PACKAGE__ . '::Result';
     }
 
     $packet->_string_null ('server_version');
@@ -162,8 +175,9 @@ sub connect ($%) {
         CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION |
         CLIENT_MULTI_STATEMENTS | CLIENT_MULTI_RESULTS;
     unless (($packet->{capability_flags} | $self->{capabilities}) == $packet->{capability_flags}) {
-      # XXX
-      die "Server does not have some capability: Server $packet->{capability_flags} / Client $self->{capabilities}";
+      die bless {is_exception => 1,
+                 packet => $packet,
+                 message => "Server does not have some capability: Server $packet->{capability_flags} / Client $self->{capabilities}"}, __PACKAGE__ . '::Result';
     }
 
     my $response = AnyEvent::MySQL::Client::SentPacket->new (1);
@@ -204,14 +218,22 @@ sub connect ($%) {
     my $packet = $_[0];
     $self->_parse_packet ($packet);
     if (not defined $packet->{header} or not $packet->{header} == OK_Packet) {
-      die $packet; # XXX
+      die bless {is_exception => 1,
+                 packet => $packet,
+                 message => "Failed to connect to server"}, __PACKAGE__ . '::Result';
     }
     $ok_command->();
+    return bless {is_success => 1,
+                  packet => $packet}, __PACKAGE__ . '::Result';
   })->catch (sub {
     my $error = $_[0];
     $self->_close_connection;
     $ng_command->();
-    return $self->{close_promise}->then (sub { die $error });
+    if (defined $self->{close_promise}) {
+      return $self->{close_promise}->then (sub { die $error });
+    } else {
+      return AnyEvent::MySQL::Client::Promise->reject ($error);
+    }
   });
 } # connect
 
@@ -221,7 +243,8 @@ sub disconnect ($) {
     $self->_close_connection;
     return $self->{close_promise};
   } else {
-    return AnyEvent::MySQL::Client::Promise->new (sub { $_[0]->() });
+    return AnyEvent::MySQL::Client::Promise->new
+        (sub { $_[0]->(bless {is_success => 1}, __PACKAGE__ . '::Result') });
   }
 } # disconnect
 
@@ -385,8 +408,10 @@ sub send_query ($$;$) {
 
 sub _close_connection ($) {
   my ($self) = @_;
-  $self->{handle}->push_shutdown;
-  $self->{handle}->start_read;
+  if (defined $self->{handle}) {
+    $self->{handle}->push_shutdown;
+    $self->{handle}->start_read;
+  }
 } # _close_connection
 
 sub _push_read_packet ($) {
@@ -398,10 +423,10 @@ sub _push_read_packet ($) {
   my $code = sub {
     my $handle = $self->{handle};
     $self->{on_eof} = sub {
-      if ($args{allow_eof}) {
+      if ($args{allow_eof} and not defined $_[0]) {
         $ok->(undef);
       } else {
-        $ng->("$args{label}: Connection closed");
+        $ng->(defined $_[0] ? $_[0] : _x "$args{label}: Connection closed");
       }
       undef $self;
     };
@@ -646,6 +671,43 @@ sub _end ($) {
   die "Packet payload too long"
       if 0xFFFFFF < length $_[0]->{payload_length};
 } # _end
+
+package AnyEvent::MySQL::Client::Result;
+use overload '""' => 'stringify', fallback => 1;
+
+sub is_success ($) { $_[0]->{is_success} }
+sub is_failure ($) { $_[0]->{is_failure} }
+sub is_exception ($) { $_[0]->{is_exception} }
+sub packet ($) { $_[0]->{packet} }
+sub column_packets ($) { $_[0]->{column_packets} }
+
+sub message ($) {
+  my $msg = $_[0]->{message};
+  if (defined $_[0]->{packet}) {
+    if (defined $_[0]->{packet}->{error_message}) {
+      $msg = defined $msg
+          ? $msg . ': ' . $_[0]->{packet}->{error_message}
+          : $_[0]->{packet}->{error_message};
+    }
+    if (defined $_[0]->{packet}->{error_code}) {
+      $msg = defined $msg ? $msg . ' ' : '';
+      $msg .= '(Error code '.$_[0]->{packet}->{error_code}.')';
+    }
+  }
+  return $msg;
+} # message
+
+## |stringify| MUST return a true value.
+sub stringify ($) {
+  my $msg = $_[0]->message;
+  if ($msg) {
+    return $msg;
+  } else {
+    return $_[0]->{is_success} ? 'Success' :
+           $_[0]->{is_failure} ? 'Failure' :
+           $_[0]->{is_exception} ? 'Exception' : 'Unknown';
+  }
+} # stringify
 
 1;
 

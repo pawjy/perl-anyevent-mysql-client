@@ -1,5 +1,7 @@
 XXX
 
+=head1 METHODS
+
 Following methods are available.
 
 =over 4
@@ -11,9 +13,10 @@ Create a new instance of the MySQL client class.
 =item $promise = $client->connect (OPTIONS)
 
 Connect to the specified MySQL server.  It returns a promise, which is
-resolved when the client object is ready to accept subsequential
-commands.  The promise is rejected if it fails to connect to the
-server.
+resolved with a result object with the handshake packet received from
+the server, when the client object is ready to accept subsequential
+commands.  The promise is rejected with a result object containing the
+error description if it fails to connect to the server.
 
 Following name/value pairs must be specified as options:
 
@@ -48,9 +51,10 @@ such that the connection to the server is grecefully closed.
 =item $promise = $client->disconnect
 
 Disconect the connection to the MySQL server, if any.  It returns a
-promise, which is resolved when the connection is closed.  If there is
-no connection, the promise is immediately resolved.  That is, this
-method might be invoked even when there is no connection.
+promise, which is resolved with a success result object when the
+connection is closed.  If there is no connection, the promise is
+immediately resolved.  That is, this method might be invoked even when
+there is no connection.
 
 =item $promise = $client->send_quit
 
@@ -69,4 +73,84 @@ promise is resolved with a false value.
 
 =back
 
+=head1 RESULT OBJECT
+
+Most methods of this class returns a promise, which is resolved or
+rejected with a B<result object>.  The result object contains the
+result of the operation, which can be accessed using the following
+methods of the result object:
+
+=over 4
+
+=item $boolean = $result->is_success
+
+=item $boolean = $result->is_failure
+
+=item $boolean = $result->is_exception
+
+Return whether the result is I<success>, I<failure>, or I<exception>,
+respectively.  A result object is either I<success>, I<failure>, or
+I<exception>.
+
+Please note that failures and exceptions are different for the purpose
+of the result object.  In general, failures are non-fatal error of an
+operation (e.g. SQL syntax error or "duplicate entry" error) while
+exceptions are fatal error of the connection (e.g. error during
+connection establishment, authorization error, or unparsable packet
+sequence).
+
+=item $packet = $result->packet
+
+The received packet which lets the client return the result object.
+If the result is a success, additional information might be retrieved
+from the packet, which is usually a C<OK_Packet>.  If the result is an
+error, descriptions of the error by the server might be retrieved from
+the packet, which is usually a C<ERR_Packet>.  If there is no relevant
+packet (e.g. a TCP error), C<undef> is returned instead.
+
+=item $string = $result->message
+
+A short description of the result, if available, or C<undef>.
+
+=item $string = '' . $result
+
+A true value which might be useful for debugging.  If C<<
+$result->message >> is a true value, it is returned.
+
+=back
+
+=head1 RECEIVED PACKET OBJECT
+
+A received packet object contains parsed packet data as hash-like
+fields.  Keys are field names shown in MySQL protocol documentation.
+
+For example, an initial handshake packet has C<protocol_version> and
+C<server_version> fields:
+
+  $client->connect (...)->then (sub {
+    my $initial_packet = shift->packet;
+    is $initial_packet->{protocol_version}, 0x0A;
+    warn $initial_packet->{server_version};
+  });
+
+=head1 SPECIFICATION
+
+MySQL Internals Manual :: 14 MySQL Client/Server Protocol
+<http://dev.mysql.com/doc/internals/en/client-server-protocol.html>.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 ACKNOWLEDGEMENTS
+
 XXX
+
+=head1 LICENSE
+
+Copyright 2014 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
