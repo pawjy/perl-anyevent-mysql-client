@@ -3,3 +3,7 @@ Carp
 Digest::SHA
 Encode
 Scalar::Util
+
+## Promise
+Carp
+AnyEvent
