@@ -1,13 +1,15 @@
 Scalar::Util~1.41
+File::Spec~3.47
 Test::Simple~1.001006
 Test::NoWarnings~1.04
 Encode~2.62
 Digest::SHA~5.92
-Test::Deep~0.113
 DBIx::RewriteDSN~0.05
+Test::Deep~0.113
 MRO::Compat~0.12
-DBI~1.631
+Path::Tiny~0.058
 File::Slurp~9999.19
+DBI~1.631
 Test::SharedFork~0.29
 Getopt::Long~2.42
 AnyEvent~7.07
@@ -23,4 +25,3 @@ DBD::mysql~4.028
 Path::Class~0.35
 File::Copy::Recursive~0.38
 Test::mysqld~0.17
-Cwd~3.47
