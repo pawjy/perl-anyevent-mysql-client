@@ -12,7 +12,7 @@ use AnyEvent::Handle;
 use AnyEvent::MySQL::Client::Promise;
 
 # XXX debug hook
-# XXX SSL
+# XXX password auth
 # XXX prepared
 # XXX new_from_dsn
 # XXX new_from_url
@@ -177,16 +177,61 @@ sub connect ($%) {
         CLIENT_LONG_FLAG | CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 |
         CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION |
         CLIENT_MULTI_STATEMENTS | CLIENT_MULTI_RESULTS;
+
+    if (defined $args{tls}) {
+      unless ($packet->{capability_flags} & CLIENT_SSL) {
+        die bless {is_exception => 1,
+                   packet => $packet,
+                   message => 'Server does not support TLS'},
+                       __PACKAGE__ . '::Result';
+      }
+      $self->{capabilities} |= CLIENT_SSL;
+    }
+
     unless (($packet->{capability_flags} | $self->{capabilities}) == $packet->{capability_flags}) {
       die bless {is_exception => 1,
                  packet => $packet,
                  message => "Server does not have some capability: Server $packet->{capability_flags} / Client $self->{capabilities}"}, __PACKAGE__ . '::Result';
     }
 
-    my $response = AnyEvent::MySQL::Client::SentPacket->new (1);
+    if (defined $args{tls}) {
+      ## <http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::SSLRequest>
+      my $req = AnyEvent::MySQL::Client::SentPacket->new (1);
+      $req->_int4 ($self->{capabilities});
+      $req->_int4 (0x1_000000);
+      $req->_int1 ($packet->{character_set}); # XXX or
+      $req->_null (23);
+      $req->_end;
+      $self->_push_send_packet ($req);
+
+      my ($tls_ok, $tls_ng) = @_;
+      my $promise = AnyEvent::MySQL::Client::Promise->new
+          (sub { ($tls_ok, $tls_ng) = @_ });
+      $self->{handle}->on_drain (sub {
+        $_[0]->on_starttls (sub {
+          if ($_[1]) {
+            $tls_ok->([$packet, 2]);
+          } else {
+            $tls_ng->(bless {is_exception => 1,
+                             message => "Can't start TLS: $_[2]"},
+                          __PACKAGE__ . '::Result');
+          }
+          $_[0]->on_starttls (undef);
+        });
+        $_[0]->on_drain (undef);
+        $_[0]->starttls ('connect', {verify => 1, %{$args{tls}}});
+      });
+      $self->{handle}->start_read;
+      return $promise;
+    } else {
+      return [$packet, 1];
+    }
+  })->then (sub {
+    my ($packet, $next_id) = @{$_[0]};
+    my $response = AnyEvent::MySQL::Client::SentPacket->new ($next_id);
     $response->_int4 ($self->{capabilities});
     $response->_int4 (0x1_000000);
-    $response->_int1 ($packet->{character_set});
+    $response->_int1 ($packet->{character_set}); # XXX or
     $response->_null (23);
     $response->_string_null (defined $args{username} ? $args{username} : ''); # XXX charset
     my $password = defined $args{password} ? $args{password} : ''; # XXX charset
@@ -680,26 +725,27 @@ sub _end ($) {
 } # _end
 
 package AnyEvent::MySQL::Client::SentPacket;
+use Carp qw(croak);
 
 sub new ($$) {
   my $packet = '';
-  die "Bad sequence ID" if $_[1] > 0xFF or $_[1] < 0;
+  croak "Bad sequence ID" if $_[1] > 0xFF or $_[1] < 0;
   return bless {payload_ref => \$packet, sequence_id => $_[1]}, $_[0];
 } # new
 
 sub _int1 ($$) {
-  die sprintf 'Bad value %d', $_[1] if $_[1] > 0xFF or $_[1] < 0;
+  croak sprintf 'Bad value %d', $_[1] if $_[1] > 0xFF or $_[1] < 0;
   ${$_[0]->{payload_ref}} .= substr pack ('V', $_[1]), 0, 1;
 } # _int1
 
 sub _int4 ($$) {
-  die sprintf 'Bad value %d', $_[1] if $_[1] > 0xFFFFFFFF or $_[1] < 0;
+  croak sprintf 'Bad value %d', $_[1] if $_[1] > 0xFFFFFFFF or $_[1] < 0;
   ${$_[0]->{payload_ref}} .= substr pack ('V', $_[1]), 0, 4;
 } # _int4
 
 sub _int_lenenc ($$) {
   if ($_[1] < 0) {
-    die "Bad value $_[1]";
+    croak "Bad value $_[1]";
   } elsif ($_[1] < 251) {
     ${$_[0]->{payload_ref}} .= pack 'C', $_[1];
   } elsif ($_[1] < 2**16) {
@@ -709,12 +755,12 @@ sub _int_lenenc ($$) {
   } elsif ($_[1] < 2**64) {
     ${$_[0]->{payload_ref}} .= "\xFE" . pack 'Q<', $_[1];
   } else {
-    die "Bad value $_[1]";
+    croak "Bad value $_[1]";
   }
 } # _int_lenenc
 
 sub _string_null ($$) {
-  die "Value has NULL" if $_[1] =~ /\x00/;
+  croak "Value contains NULL" if $_[1] =~ /\x00/;
   ${$_[0]->{payload_ref}} .= $_[1] . "\x00";
 } # _string_null
 
@@ -737,7 +783,7 @@ sub _null ($$) {
 
 sub _end ($) {
   $_[0]->{payload_length} = length ${$_[0]->{payload_ref}};
-  die "Packet payload too long"
+  croak "Packet payload too long"
       if 0xFFFFFF < length $_[0]->{payload_length};
 } # _end
 

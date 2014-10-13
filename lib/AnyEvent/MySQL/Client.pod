@@ -56,6 +56,21 @@ The ASCII hostname of the server.
 
 The port number of the server.
 
+=item tls => {options}
+
+Whether TLS (SSL) is used to connect to the server or not.  If
+specified, the value must be a hash reference, which is used to create
+L<AnyEvent::TLS> context object.  Semantics of these options are same
+as L<AnyEvent::TLS>, except that C<verify> option's default is enabled
+(true).  If not specified, TLS is not used.  An example:
+
+  $client->connect (..., tls => {
+    verify => 1,
+    ca_file => "path/to/ca-cert.pem",
+    key_file => "path/to/client-key.pem",
+    cert_file => "path/to/client-cert.pem",
+  });
+
 =item username => $string
 
 The user name for the authorization, if necessary.

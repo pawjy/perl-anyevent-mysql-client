@@ -283,6 +283,35 @@ test {
   });
 } n => 1, name => 'die while sending and then disconnect';
 
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname},
+       tls => 1)->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_exception;
+      like $x->message, qr{TLS};
+      ok $x->packet;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'server does not support TLS';
+
 run_tests;
 
 =head1 LICENSE
