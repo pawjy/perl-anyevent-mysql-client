@@ -417,11 +417,15 @@ sub send_query ($$;$) {
               push @{$packet->{data}}, delete $packet->{_data};
             }
             $packet->_end;
-            $on_row->(bless {is_success => 1,
-                             column_packets => \@column,
-                             packet => $packet}, __PACKAGE__ . '::Result')
-                if defined $on_row;
-            return $read_row_code->();
+            if (defined $on_row) {
+              return AnyEvent::MySQL::Client::Promise->resolve->then (sub {
+                $on_row->(bless {is_success => 1,
+                                 column_packets => \@column,
+                                 packet => $packet}, __PACKAGE__ . '::Result');
+              })->then ($read_row_code);
+            } else {
+              return $read_row_code->();
+            }
           } elsif ($packet->{header} == OK_Packet or
                    $packet->{header} == EOF_Packet) {
             return bless {is_success => 1,

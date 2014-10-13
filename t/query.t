@@ -181,6 +181,46 @@ test {
   });
 } n => 16, name => 'query with with callback, success';
 
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  my @result;
+  my $i = 10;
+  my $j = 100;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->send_query ('create table foo2 (id int)')->then (sub {
+      return $client->send_query ('insert into foo2 (id) values (15), (31)');
+    })->then (sub {
+      return $client->send_query ('select * from foo2 order by id asc', sub {
+        push @result, $i++;
+        return AnyEvent::MySQL::Client::Promise->resolve->then (sub {
+          push @result, $j++;
+        });
+      });
+    });
+  })->then (sub {
+    test {
+      is_deeply \@result, [10, 100, 11, 101];
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'query with with callback, return promise';
+
 run_tests;
 
 =head1 LICENSE

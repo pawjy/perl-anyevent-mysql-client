@@ -116,9 +116,10 @@ with a result object, whose C<packet> contains a field C<data> which
 is an array reference of values returned by the server (i.e. the
 column values in the row) and whose C<column_packets> contains an
 array reference of packets representing the columns in the row.  The
-row callback is not expected to throw any exception.  Column
-name/value pairs of the rows returned by a query can be enumerated by
-the following code:
+row callback can return a promise need to be resolved before continue,
+or can throw an exception.  In other words, it can be used in the same
+way as the fulfill callback of a promise.  Column name/value pairs of
+the rows returned by a query can be enumerated by the following code:
 
   $client->send_query ('SELECT * FROM table', sub {
     my $row = shift;
