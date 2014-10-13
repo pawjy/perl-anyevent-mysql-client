@@ -1,0 +1,22 @@
+=head1 NAME
+
+AnyEvent::MySQL::Client::Result - A MySQL operation result
+
+=head1 DESCRIPTION
+
+An C<AnyEvent::MySQL::Client::Result> object represents a result of
+L<AnyEvent::MySQL::Client> operations.  See
+L<AnyEvent::MySQL::Client/RESULT OBJECT> for more information.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2014 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

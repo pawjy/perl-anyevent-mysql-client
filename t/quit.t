@@ -21,8 +21,14 @@ test {
        database => $dsn{dbname})->then (sub {
     return $client->send_quit;
   })->then (sub {
+    my $x = shift;
     test {
-      ok 1;
+      ok $x;
+      isa_ok $x, 'AnyEvent::MySQL::Client::Result';
+      ok $x->is_success;
+      ok not $x->is_failure;
+      ok not $x->is_exception;
+      ok $x->message;
     } $c;
   }, sub {
     test {
@@ -39,14 +45,20 @@ test {
       undef $client;
     } $c;
   });
-} n => 2, name => 'after connect';
+} n => 7, name => 'after connect';
 
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->send_quit->then (sub {
+    my $x = shift;
     test {
-      ok 1;
+      ok $x;
+      isa_ok $x, 'AnyEvent::MySQL::Client::Result';
+      ok $x->is_success;
+      ok not $x->is_failure;
+      ok not $x->is_exception;
+      ok $x->message;
     } $c;
   }, sub {
     test {
@@ -62,7 +74,29 @@ test {
       undef $c;
     } $c;
   });
-} n => 2, name => 'before connect';
+} n => 7, name => 'before connect';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->send_quit->DIE;
+  })->catch (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      test {
+        ok 1;
+      } $c;
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'die while sending and then disconnect';
 
 run_tests;
 

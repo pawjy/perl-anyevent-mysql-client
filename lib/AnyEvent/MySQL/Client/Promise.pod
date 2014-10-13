@@ -1,0 +1,23 @@
+=head1 NAME
+
+AnyEvent::MySQL::Client::Promise - A promise
+
+=head1 DESCRIPTION
+
+An C<AnyEvent::MySQL::Client::Promise> object is a promise, which is
+equivalent and compatible with the L<Promise> module.  See
+<https://github.com/wakaba/perl-promise/blob/master/lib/Promise.pod>
+for more information.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2014 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

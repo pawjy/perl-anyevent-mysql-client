@@ -1,0 +1,23 @@
+=head1 NAME
+
+AnyEvent::MySQL::Client::ReceivedPacket - A MySQL packet received from server
+
+=head1 DESCRIPTION
+
+An C<AnyEvent::MySQL::Client::ReceivedPacket> object represents a
+MySQL protocol packet received from the server.  See
+L<AnyEvent::MySQL::Client/RECEIVED PACKET OBJECT> for more
+information.
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2014 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

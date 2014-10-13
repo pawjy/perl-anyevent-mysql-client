@@ -1,8 +1,34 @@
-XXX
+=head1 NAME
+
+AnyEvent::MySQL::Client - A low-level MySQL client API
+
+=head1 SYNOPSIS
+
+  use AnyEvent::MySQL::Client;
+  $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => $hostname, port => $port,
+       username => $username, password => $password,
+       database => $dbname)->then (sub {
+    return $client->send_query ('insert into hoge (id) values (12)');
+  })->then (sub {
+    die $_[0] if $_[0]->is_failure;
+    return $client->send_query ('insert into fuga (id) values (56)');
+  })->catch (sub {
+    warn $_[0];
+  })->then (sub {
+    $client->disconnect;
+  });
+
+=head1 DESCRIPTION
+
+The C<AnyEvent::MySQL::Client> module provides a low-level client API
+for the MySQL server/client protocol, built on top of L<AnyEvent> and
+L<Promise>.
 
 =head1 METHODS
 
-Following methods are available.
+Following methods are available:
 
 =over 4
 
@@ -59,10 +85,10 @@ there is no connection.
 =item $promise = $client->send_quit
 
 Send a C<COM_QUIT> command, which will let the server close the
-connection.  It returns a promise, which is resolved when the
-connection is closed.  If there is no connection, the promise is
-immediately resolved.  That is, this method might be invoked even when
-there is no connection.
+connection.  It returns a promise, which is resolved with a success
+result object when the connection is closed.  If there is no
+connection, the promise is immediately resolved.  That is, this method
+might be invoked even when there is no connection.
 
 =item $promise = $client->send_ping
 
@@ -70,6 +96,49 @@ Send a C<COM_PING> command.  It returns a promise, which is resolved
 with a true value when the server responds to the command.  If the
 server does not return a response, or if there is no connection, the
 promise is resolved with a false value.
+
+Note that the promise returned by this method is resolved with a
+boolean value unlike other methods of this class.
+
+=item $promise = $client->send_query ($query[, $row_callback])
+
+Send a C<COM_QUERY> command with the specified query (an SQL
+statement).  It returns a promise, which is resolved with the result
+object containing the evaluation result of the specified query.
+
+The first argument must be an SQL statement.  It cannot use the
+placeholder syntax (C<?>).
+
+The second argument, if specified, must be a code reference for the
+row callback.  The code is invoked whenever a resultset is returned
+from the server as part of the response to the query.  It is invoked
+with a result object, whose C<packet> contains a field C<data> which
+is an array reference of values returned by the server (i.e. the
+column values in the row) and whose C<column_packets> contains an
+array reference of packets representing the columns in the row.  The
+row callback is not expected to throw any exception.  Column
+name/value pairs of the rows returned by a query can be enumerated by
+the following code:
+
+  $client->send_query ('SELECT * FROM table', sub {
+    my $row = shift;
+    my @col = map { $_->{name} } @{$row->column_packets};
+    my $data = $row->packet->{data};
+    for (0..$#col) {
+      printf "Column `%s` = %s\n", $col[$_], $data->[$_] // '(NULL)';
+    }
+  });
+
+The promise returned by the method is resolved with the result object
+for the entire query.  It can be both success or failure.  For
+example, if the query results in a "duplicate entry" error, the
+promise's fulfill callback is invoked with a failure result object
+with that error packet.  The promise is resolved only after any
+possible invocations of the row callback have been done.  If the
+promise is resolved with a failure result object, the row callback has
+never been invoked.  Note that additional information on query such as
+affected row count might be available in the C<packet> of a success
+result object.
 
 =back
 
@@ -133,6 +202,12 @@ C<server_version> fields:
     warn $initial_packet->{server_version};
   });
 
+=head1 DEPENDENCY
+
+Perl 5.8 or later and L<AnyEvent> is required.  It also requires some
+core modules, including L<Digest::SHA> (which is a core module since
+Perl 5.9.3).
+
 =head1 SPECIFICATION
 
 MySQL Internals Manual :: 14 MySQL Client/Server Protocol
@@ -144,7 +219,11 @@ Wakaba <wakaba@suikawiki.org>.
 
 =head1 ACKNOWLEDGEMENTS
 
-XXX
+This module is inspired by various earlier works on this area,
+including L<DBI>, L<DBD::mysql>, L<AnyEvent::DBI>,
+L<AnyEvent::DBI::MySQL>, and L<AnyEvent::MySQL>.
+
+Thanks to suzak and hatz48.
 
 =head1 LICENSE
 

@@ -34,7 +34,7 @@ test {
     my @row;
     return $client->send_query (q{select id from foo}, sub {
       push @row, $_[0];
-    })->then (sub { return $row[0]->[1]->{data}->[0] });
+    })->then (sub { return $row[0]->packet->{data}->[0] });
   })->then (sub {
     my $result = $_[0];
     return $client->send_quit->then (sub { return $result });

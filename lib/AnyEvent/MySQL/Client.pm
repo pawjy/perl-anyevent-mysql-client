@@ -11,16 +11,13 @@ use Encode qw(encode);
 use AnyEvent::Handle;
 use AnyEvent::MySQL::Client::Promise;
 
-# XXX cleanup
-# XXX result object
-# XXX exception object
 # XXX debug hook
 # XXX SSL
 # XXX prepared
 # XXX new_from_dsn
 # XXX new_from_url
 # XXX transaction
-# XXX docs
+# XXX charset handling
 
 ## Capability flags
 ## <http://dev.mysql.com/doc/internals/en/capability-flags.html>.
@@ -61,10 +58,6 @@ sub _b ($) {
   return utf8::is_utf8 ($_[0]) ? encode ('utf-8', $_[0]) : $_[0];
 } # _b
 
-sub _x ($) {
-  return bless {is_exception => 1, message => $_[0]}, __PACKAGE__ . '::Result';
-} # _x
-
 sub new ($) {
   my $class = shift;
   return bless {}, $class;
@@ -73,7 +66,8 @@ sub new ($) {
 sub connect ($%) {
   my ($self, %args) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
-      (_x "There is a connection")
+      (bless {is_exception => 1,
+              message => 'There is a connection'}, __PACKAGE__ . '::Result')
           if defined $self->{connect_promise};
 
   my ($ok_close, $ng_close);
@@ -83,6 +77,7 @@ sub connect ($%) {
 
   $self->{handle} = AnyEvent::Handle->new
       (connect => [$args{hostname}, $args{port}],
+       no_delay => 1,
        on_connect => sub {
          #
        },
@@ -90,10 +85,14 @@ sub connect ($%) {
          my ($hdl, $msg) = @_;
          $hdl->destroy;
          if (defined $self->{on_eof}) {
-           $self->{on_eof}->(_x $msg);
+           $self->{on_eof}->(bless {is_exception => 1,
+                                    code => 0+$!,
+                                    message => $msg}, __PACKAGE__ . '::Result');
            $ok_close->(bless {is_success => 1}, __PACKAGE__ . '::Result');
          } else {
-           $ng_close->(_x $msg);
+           $ng_close->(bless {is_exception => 1,
+                              code => 0+$!,
+                              message => $msg}, __PACKAGE__ . '::Result');
          }
          delete $self->{handle};
          delete $self->{connect_promise};
@@ -104,10 +103,14 @@ sub connect ($%) {
          my ($hdl, $fatal, $msg) = @_;
          $hdl->destroy;
          if (defined $self->{on_eof}) {
-           $self->{on_eof}->(_x $msg);
+           $self->{on_eof}->(bless {is_exception => 1,
+                                    code => 0+$!,
+                                    message => $msg}, __PACKAGE__ . '::Result');
            $ok_close->(bless {is_success => 1}, __PACKAGE__ . '::Result');
          } else {
-           $ng_close->(_x $msg);
+           $ng_close->(bless {is_exception => 1,
+                              code => 0+$!,
+                              message => $msg}, __PACKAGE__ . '::Result');
          }
          delete $self->{handle};
          delete $self->{connect_promise};
@@ -135,7 +138,7 @@ sub connect ($%) {
 
     $packet->_int (1 => 'version');
     unless ($packet->{version} == 0x0A) {
-      $self->_close_connection;
+      $self->_terminate_connection;
       die bless {is_exception => 1,
                  packet => $packet,
                  message => sprintf 'Protocol version %02X not supported',
@@ -227,7 +230,7 @@ sub connect ($%) {
                   packet => $packet}, __PACKAGE__ . '::Result';
   })->catch (sub {
     my $error = $_[0];
-    $self->_close_connection;
+    $self->_terminate_connection;
     $ng_command->();
     if (defined $self->{close_promise}) {
       return $self->{close_promise}->then (sub { die $error });
@@ -237,10 +240,20 @@ sub connect ($%) {
   });
 } # connect
 
+sub _terminate_connection ($) {
+  my ($self) = @_;
+  if (defined $self->{handle}) {
+    $self->{handle}->wtimeout (0.1);
+    $self->{handle}->push_shutdown;
+    $self->{handle}->start_read;
+  }
+} # _terminate_connection
+
 sub disconnect ($) {
   my $self = $_[0];
   if (defined $self->{connect_promise}) {
-    $self->_close_connection;
+    $self->{handle}->push_shutdown;
+    $self->{handle}->start_read;
     return $self->{close_promise};
   } else {
     return AnyEvent::MySQL::Client::Promise->new
@@ -250,7 +263,9 @@ sub disconnect ($) {
 
 sub send_quit ($) {
   my ($self) = @_;
-  return AnyEvent::MySQL::Client::Promise->new (sub { $_[0]->() })
+  return AnyEvent::MySQL::Client::Promise->new
+      (sub { $_[0]->(bless {is_success => 1,
+                            message => 'Not connected'}, __PACKAGE__ . '::Result') })
       unless defined $self->{connect_promise};
   return $self->{command_promise} = $self->{command_promise}->then (sub {
     my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
@@ -265,13 +280,24 @@ sub send_quit ($) {
     my $packet = $_[0] or return undef;
     $self->_parse_packet ($packet);
     if (not defined $packet->{header} or not $packet->{header} == OK_Packet) {
-      die $packet; # XXX
+      die bless {is_exception => 1,
+                 message => 'Unexpected packet for COM_QUIT',
+                 packet => $packet}, __PACKAGE__ . '::Result';
     }
     return undef;
-  })->catch (sub {
-    $self->_close_connection;
   })->then (sub {
-    return $self->{close_promise};
+    return $self->disconnect;
+  }, sub {
+    my $result = $_[0];
+    if ($result->is_exception and
+        defined $result->{code} and
+        $result->{code} == 32) { # EPIPE
+      delete $result->{is_exception};
+      $result->{is_success} = 1;
+      return $result;
+    } else {
+      return $self->disconnect->then (sub { die $result });
+    }
   });
 } # send_quit
 
@@ -291,21 +317,30 @@ sub send_ping ($) {
     my $packet = $_[0];
     $self->_parse_packet ($packet);
     if (not defined $packet->{header} or not $packet->{header} == OK_Packet) {
-      die $packet; # XXX
+      die bless {is_exception => 1,
+                 message => 'Unexpected packet for COM_PING',
+                 packet => $packet}, __PACKAGE__ . '::Result';
     }
     return undef;
-  })->then (sub { return 1 }, sub { $self->_close_connection; return 0 });
+  })->then (sub {
+    $self->{handle}->start_read;
+    return 1;
+  }, sub {
+    $self->_terminate_connection;
+    return 0;
+  });
 } # send_ping
 
 sub send_query ($$;$) {
   my ($self, $query, $on_row) = @_;
-  return AnyEvent::MySQL::Client::Promise->new
-      (sub { $_[1]->("Not connected") })
-      unless defined $self->{connect_promise};
+  return AnyEvent::MySQL::Client::Promise->reject
+      (bless {is_exception => 1,
+              message => 'Not connected'}, __PACKAGE__ . '::Result')
+          unless defined $self->{connect_promise};
   $self->{command_promise} = $self->{command_promise}->then (sub {
     my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
     $packet->_int1 (COM_QUERY);
-    $packet->_string_eof (defined $query ? _b $query : '');
+    $packet->_string_eof (defined $query ? _b $query : ''); # XXX charset
     $packet->_end;
     $self->_push_send_packet ($packet);
     return $self->_push_read_packet
@@ -358,7 +393,9 @@ sub send_query ($$;$) {
           $self->_parse_packet ($packet);
           if (not defined $packet->{header} or
               not $packet->{header} == EOF_Packet) {
-            die $packet; # XXX
+            die bless {is_exception => 1,
+                       message => 'Unexpected packet',
+                       packet => $packet}, __PACKAGE__ . '::Result';
           }
         });
       }
@@ -380,39 +417,44 @@ sub send_query ($$;$) {
               push @{$packet->{data}}, delete $packet->{_data};
             }
             $packet->_end;
-            $on_row->([\@column, $packet]) if defined $on_row; # XXX
+            $on_row->(bless {is_success => 1,
+                             column_packets => \@column,
+                             packet => $packet}, __PACKAGE__ . '::Result')
+                if defined $on_row;
             return $read_row_code->();
           } elsif ($packet->{header} == OK_Packet or
                    $packet->{header} == EOF_Packet) {
-            return [\@column, $packet]; # XXX
+            return bless {is_success => 1,
+                          column_packets => \@column,
+                          packet => $packet}, __PACKAGE__ . '::Result';
           } elsif ($packet->{header} == ERR_Packet) {
-            return $packet; # XXX
+            return bless {is_failure => 1,
+                          packet => $packet}, __PACKAGE__ . '::Result';
           } else { # Unknown
-            die $packet; # XXX
+            die bless {is_exception => 1,
+                       message => 'Unexpected packet',
+                       packet => $packet}, __PACKAGE__ . '::Result';
           }
         });
       };
       return $promise->then (sub { $read_row_code->() });
     } elsif ($packet->{header} == OK_Packet) {
-      return $packet; # XXX
+      return bless {is_success => 1, packet => $packet}, __PACKAGE__ . '::Result';
     } elsif ($packet->{header} == ERR_Packet) {
-      return $packet; # XXX
+      return bless {is_failure => 1, packet => $packet}, __PACKAGE__ . '::Result';
     } else { # not supported
-      die $packet; # XXX
+      die bless {is_exception => 1,
+                 message => 'Unexpected packet',
+                 packet => $packet}, __PACKAGE__ . '::Result';
     }
-  })->catch (sub {
-    $self->_close_connection;
+  })->then (sub {
+    $self->{handle}->start_read;
+    return $_[0];
+  }, sub {
+    $self->_terminate_connection;
     die $_[0];
   });
 } # send_query
-
-sub _close_connection ($) {
-  my ($self) = @_;
-  if (defined $self->{handle}) {
-    $self->{handle}->push_shutdown;
-    $self->{handle}->start_read;
-  }
-} # _close_connection
 
 sub _push_read_packet ($) {
   my ($self, %args) = @_;
@@ -426,15 +468,17 @@ sub _push_read_packet ($) {
       if ($args{allow_eof} and not defined $_[0]) {
         $ok->(undef);
       } else {
-        $ng->(defined $_[0] ? $_[0] : _x "$args{label}: Connection closed");
+        $ng->(defined $_[0] ? $_[0]
+                            : (bless {is_exception => 1,
+                                      message => "$args{label}: Connection closed"}, __PACKAGE__ . '::Result'));
       }
       undef $self;
     };
     $handle->rtimeout (0);
     $handle->rtimeout_reset;
     $handle->on_rtimeout (sub {
-      my $hdl = $_[0];
-      $ng->("$args{label}: Timeout");
+      $ng->(bless {is_exception => 1,
+                   message => "$args{label}: Timeout"}, __PACKAGE__ . '::Result');
       $_[0]->push_shutdown;
     });
     $handle->rtimeout ($args{timeout} || 10);
@@ -529,15 +573,20 @@ sub DESTROY {
 }
 
 package AnyEvent::MySQL::Client::ReceivedPacket;
-use Carp qw(croak);
 
 sub _skip ($$) {
-  croak "Incomplete packet" unless $_[0]->_has_more_bytes ($_[1]);
+  die bless {is_exception => 1,
+             packet => $_[0],
+             message => "Incomplete packet"}, 'AnyEvent::MySQL::Client::Result'
+                 unless $_[0]->_has_more_bytes ($_[1]);
   pos (${$_[0]->{payload_ref}}) += $_[1];
 } # _skip
 
 sub _int ($$$) {
-  croak "Incomplete packet" unless $_[0]->_has_more_bytes ($_[1]);
+  die bless {is_exception => 1,
+             packet => $_[0],
+             message => "Incomplete packet"}, 'AnyEvent::MySQL::Client::Result'
+                 unless $_[0]->_has_more_bytes ($_[1]);
   my $pos = pos ${$_[0]->{payload_ref}};
   pos (${$_[0]->{payload_ref}}) += $_[1];
   $_[0]->{$_[2]} = unpack 'V', substr (${$_[0]->{payload_ref}}, $pos, $_[1]) . "\x00\x00\x00";
@@ -547,9 +596,15 @@ sub _int_lenenc ($$) {
   my $pos = pos ${$_[0]->{payload_ref}};
   my $fb = substr ${$_[0]->{payload_ref}}, $pos, 1;
   if ($fb eq "\xFB") {
-    die "0xFB is specified as int<lenenc>";
+    die bless {is_exception => 1,
+               packet => $_[0],
+               message => "0xFB is specified as int<lenenc>"},
+                   'AnyEvent::MySQL::Client::Result';
   } elsif ($fb eq "\xFF") {
-    die "0xFF is specified as int<lenenc>";
+    die bless {is_exception => 1,
+               packet => $_[0],
+               message => "0xFF is specified as int<lenenc>"},
+                   'AnyEvent::MySQL::Client::Result';
   } elsif ($fb eq "\xFC") {
     $_[0]->{$_[1]} = unpack 'v', substr ${$_[0]->{payload_ref}}, $pos + 1, 2;
     pos (${$_[0]->{payload_ref}}) += 2;
@@ -566,7 +621,10 @@ sub _int_lenenc ($$) {
 } # _int_lenenc
 
 sub _string ($$$) {
-  croak "Incomplete packet" unless $_[0]->_has_more_bytes ($_[1]);
+  die bless {is_exception => 1,
+             packet => $_[0],
+             message => "Incomplete packet"}, 'AnyEvent::MySQL::Client::Result'
+                 unless $_[0]->_has_more_bytes ($_[1]);
   my $pos = pos ${$_[0]->{payload_ref}};
   pos (${$_[0]->{payload_ref}}) += $_[1];
   $_[0]->{$_[2]} = substr ${$_[0]->{payload_ref}}, $pos, $_[1];
@@ -579,7 +637,10 @@ sub _string_eof ($$) {
 
 sub _string_null ($$) {
   ${$_[0]->{payload_ref}} =~ /\G([^\x00]*)\x00/gc
-      or croak "Incomplete packet received";
+      or die bless {is_exception => 1,
+                    packet => $_[0],
+                    message => "Incomplete packet"},
+                        'AnyEvent::MySQL::Client::Result';
   $_[0]->{$_[1]} = $1;
 } # _string_null
 
@@ -604,9 +665,13 @@ sub _has_more_bytes ($;$) {
 } # _has_more_bytes
 
 sub _end ($) {
-  croak sprintf "Packet has remaining data (%d < %d)",
-      pos ${$_[0]->{payload_ref}}, length ${$_[0]->{payload_ref}}
-      if $_[0]->_has_more_bytes (1);
+  die bless {is_exception => 1,
+             packet => $_[0],
+             message => (sprintf "Packet has remaining data (%d < %d)",
+                             pos ${$_[0]->{payload_ref}},
+                             length ${$_[0]->{payload_ref}})},
+                                 'AnyEvent::MySQL::Client::Result'
+                                     if $_[0]->_has_more_bytes (1);
   delete $_[0]->{payload_ref};
 } # _end
 

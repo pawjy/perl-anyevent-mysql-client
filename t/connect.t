@@ -40,15 +40,17 @@ test {
     my @row;
     return $client->send_query (q{select id from foo}, sub {
       push @row, $_[0];
-    })->then (sub { return $row[0]->[1]->{data}->[0] });
+    })->then (sub { return $row[0]->packet->{data}->[0] });
   })->then (sub {
     my $result = $_[0];
     test {
       is $result, 12;
     } $c;
   })->catch (sub {
+    my $result = $_[0];
     test {
       ok 0;
+      is $result, undef;
     } $c;
     return undef;
   })->then (sub {
@@ -258,6 +260,28 @@ test {
     } $c;
   });
 } n => 3, name => 'disconnect not connected';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->send_ping->DIE;
+  })->catch (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      test {
+        ok 1;
+      } $c;
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'die while sending and then disconnect';
 
 run_tests;
 
