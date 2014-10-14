@@ -179,6 +179,55 @@ never been invoked.  Note that additional information on query such as
 affected row count might be available in the C<packet> of a success
 result object.
 
+=item $promise = $client->send_statement_prepare ($query)
+
+Send a C<COM_STMT_PREPARE> command with the specified query (an SQL
+statement).  It returns a promise, which is resolved with the result
+object containing the statement ID of the prepared statement.
+
+The first argument must be an SQL statement, possibly containing
+placeholders (C<?>).  It must be a byte string encoded in the
+character encoding of the connection.
+
+If the returned promise is resolved with a I<success> return object,
+the statement ID of the statement prepared can be accessed by C<<
+$result->packet->{statement_id} >>.
+
+=item $promise = $client->send_statement_execute ($statement_id, [$value1, $value2, ...][, $on_row])
+
+Send a C<COM_STMT_EXECUTE> command with the specified parameters
+(i.e. the arguments to the prepared statement's placeholders).  It
+returns a promise, which is resolved with the result object containing
+the evaluation result of the prepared statement with the parameters.
+
+The first argument must be the statement ID of the prepared statement
+to execute.
+
+The second argument, if specified to non-C<undef> value, must be an
+array reference containing typed values (see L</TYPED VALUES>)
+representing parameters in order, possibly empty.
+
+The third argument, if specified, must be a code reference, which is
+the row callback similar to C<send_query> method's argument, except
+that the items of C<< @{$_[0]->packet->{data}} >> are typed values
+representing columns in the row.
+
+The promise returned by the method is resolved with the result object
+for the entire query, similar to the returned promise of the C<query>
+method.
+
+=item $promise = $client->send_statement_close ($statement_id)
+
+Send a C<COM_STMT_CLOSE> command with the specified statement ID.  It
+returns a promise, which is resolved with the result object containing
+whether the command has succeeded or not.
+
+=item $promise = $client->send_statement_reset ($statement_id)
+
+Send a C<COM_STMT_RESET> command with the specified statement ID.  It
+returns a promise, which is resolved with the result object containing
+whether the command has succeeded or not.
+
 =back
 
 =head1 RESULT OBJECT
@@ -263,6 +312,27 @@ C<server_version> fields:
     is $initial_packet->{protocol_version}, 0x0A;
     warn $initial_packet->{server_version};
   });
+
+=head1 TYPED VALUES
+
+A B<typed value> represents a value in MySQL binary protocol.  It is a
+hash reference which can contain C<type>, C<unsigned>, and C<value>
+key/value pairs.
+
+The value of C<type> identifies the type of the value.  It must be one
+of the following values: C<DECIMAL>, C<TINY>, C<SHORT>, C<LONG>,
+C<FLOAT>, C<DOUBLE>, C<TIMESTAMP>, C<LONGLONG>, C<DATE>, C<TIME>,
+C<DATETIME>, C<VARCHAR>, C<BIT>, C<NEWDECIMAL>, C<ENUM>, C<SET>,
+C<TINY_BLOB>, C<MEDIUM_BLOB>, C<LONG_BLOB>, C<BLOB>, C<VAR_STRING>,
+C<STRING>, or C<GEOMETRY>.  If C<unsigned> is true, the "unsigned"
+variant of C<type> is used as the type.
+
+If C<value> is C<undef>, the typed value represents a C<NULL> value.
+Otherwise, the typed value represents a non-C<NULL> value and C<value>
+is interpreted in the context of C<type> and C<unsigned>.  It must be
+within the range of the type.  The value cannot be a utf8-flagged
+string.  Strings are interpreted using the character set of the
+connection.
 
 =head1 DEPENDENCY
 

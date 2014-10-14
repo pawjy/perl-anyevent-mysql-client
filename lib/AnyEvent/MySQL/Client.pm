@@ -10,10 +10,6 @@ use Digest::SHA qw(sha1);
 use AnyEvent::Handle;
 use AnyEvent::MySQL::Client::Promise;
 
-# XXX statement execute with resultset
-# XXX statement close
-# XXX statement reset
-# XXX statement_* docs
 # XXX time/timestamp types
 # XXX debug hook
 # XXX new_from_dsn
@@ -45,13 +41,20 @@ sub CLIENT_DEPRECATE_EOF                  () { 0x01000000 }
 
 ## Status flags
 ## <http://dev.mysql.com/doc/internals/en/status-flags.html>.
+sub SERVER_STATUS_CURSOR_EXISTS () { 0x0040 }
 sub SERVER_SESSION_STATE_CHANGED () { 0x4000 }
+
+## Column definition's |flags| value
+## <http://dev.mysql.com/doc/refman/5.7/en/c-api-data-structures.html>.
+sub UNSIGNED_FLAG () { 32 }
 
 sub COM_QUIT         () { 0x01 }
 sub COM_QUERY        () { 0x03 }
 sub COM_PING         () { 0x0E }
 sub COM_STMT_PREPARE () { 0x16 }
 sub COM_STMT_EXECUTE () { 0x17 }
+sub COM_STMT_CLOSE   () { 0x19 }
+sub COM_STMT_RESET   () { 0x1A }
 
 sub OK_Packet  () { 0x00 }
 sub ERR_Packet () { 0xFF }
@@ -112,6 +115,7 @@ sub connect ($%) {
   $self->{handle} = AnyEvent::Handle->new
       (connect => [$args{hostname}, $args{port}],
        no_delay => 1,
+       wtimeout => $self->query_packet_timeout,
        on_connect => sub {
          #
        },
@@ -342,8 +346,20 @@ sub disconnect ($) {
   my $self = $_[0];
   if (defined $self->{connect_promise}) {
     $self->{handle}->push_shutdown;
-    $self->{handle}->start_read;
-    return $self->{close_promise};
+    $self->{handle}->push_read (sub { return 0 }); # discard
+    return $self->{close_promise}->catch (sub {
+      my $result = $_[0];
+      if (ref $result and
+          $result->is_exception and
+          defined $result->{code} and
+          $result->{code} == 32) { # EPIPE
+        delete $result->{is_exception};
+        $result->{is_success} = 1;
+        return $result;
+      } else {
+        die $result;
+      }
+    });
   } else {
     return AnyEvent::MySQL::Client::Promise->new
         (sub { $_[0]->(bless {is_success => 1}, __PACKAGE__ . '::Result') });
@@ -367,6 +383,10 @@ sub send_quit ($) {
          allow_eof => 1);
   })->then (sub {
     my $packet = $_[0] or return undef;
+    die bless {is_exception => 1,
+               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               packet => $packet}, __PACKAGE__ . '::Result'
+                   unless $packet->{sequence_id} == 1;
     $self->_parse_packet ($packet);
     if (not defined $packet->{header} or not $packet->{header} == OK_Packet) {
       die bless {is_exception => 1,
@@ -378,7 +398,8 @@ sub send_quit ($) {
     return $self->disconnect;
   }, sub {
     my $result = $_[0];
-    if ($result->is_exception and
+    if (ref $result and
+        $result->is_exception and
         defined $result->{code} and
         $result->{code} == 32) { # EPIPE
       delete $result->{is_exception};
@@ -404,6 +425,10 @@ sub send_ping ($) {
          timeout => $self->connection_packet_timeout);
   })->then (sub {
     my $packet = $_[0];
+    die bless {is_exception => 1,
+               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               packet => $packet}, __PACKAGE__ . '::Result'
+                   unless $packet->{sequence_id} == 1;
     $self->_parse_packet ($packet);
     if (not defined $packet->{header} or not $packet->{header} == OK_Packet) {
       die bless {is_exception => 1,
@@ -433,6 +458,7 @@ my $ReadEOFPacket = sub ($) {
                  message => 'Unexpected packet',
                  packet => $packet}, __PACKAGE__ . '::Result';
     }
+    return $packet;
   });
 }; # $ReadEOFPacket
 
@@ -491,6 +517,11 @@ sub send_query ($$;$) {
          timeout => $self->query_packet_timeout);
   })->then (sub {
     my $packet = $_[0];
+    die bless {is_exception => 1,
+               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               packet => $packet}, __PACKAGE__ . '::Result'
+                   unless $packet->{sequence_id} == 1;
+
     ## <http://dev.mysql.com/doc/internals/en/com-query-response.html>.
     $self->_parse_packet ($packet);
     if (not defined $packet->{header}) {
@@ -592,6 +623,10 @@ sub send_statement_prepare ($$) {
          timeout => $self->query_packet_timeout);
   })->then (sub {
     my $packet = $_[0];
+    die bless {is_exception => 1,
+               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               packet => $packet}, __PACKAGE__ . '::Result'
+                   unless $packet->{sequence_id} == 1;
     if (0x00 == unpack 'C', substr ${$packet->{payload_ref}}, 0, 1) {
       ## <http://dev.mysql.com/doc/internals/en/com-stmt-prepare-response.html>.
       $packet->_int (1 => 'status');
@@ -645,14 +680,14 @@ sub send_statement_prepare ($$) {
   });
 } # send_statement_prepare
 
-sub send_statement_execute ($$;$) {
-  my ($self, $statement_id, $params) = @_;
+sub send_statement_execute ($$;$$) {
+  my ($self, $statement_id, $params, $on_row) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
       (bless {is_exception => 1,
               message => 'Not connected'}, __PACKAGE__ . '::Result')
           unless defined $self->{connect_promise};
 
-  $params = AnyEvent::MySQL::Client::Params->pack ($params);
+  $params = AnyEvent::MySQL::Client::Values->pack ($params);
   if (defined $params->{error}) {
     return $self->{command_promise} = $self->{command_promise}->then (sub {
       return $params->{error};
@@ -676,10 +711,66 @@ sub send_statement_execute ($$;$) {
          timeout => $self->query_packet_timeout);
   })->then (sub {
     my $packet = $_[0];
+    die bless {is_exception => 1,
+               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               packet => $packet}, __PACKAGE__ . '::Result'
+                   unless $packet->{sequence_id} == 1;
     $self->_parse_packet ($packet);
     if (not defined $packet->{header}) {
-      #XXX
-      die;
+      ## <http://dev.mysql.com/doc/internals/en/binary-protocol-resultset.html>.
+      $packet->_int_lenenc ('column_count');
+      my $column_count = $packet->{column_count};
+      $packet->_end;
+      
+      my @column;
+      return AnyEvent::MySQL::Client::Promise->all ([
+        (map {
+          $ReadColumnDefinition->($self, \@column);
+        } 1..$column_count),
+        $ReadEOFPacket->($self),
+      ])->then (sub {
+        unless ($_[0]->[-1]->{status_flags} & SERVER_STATUS_CURSOR_EXISTS) {
+          weaken ($self = $self);
+          my $read_row_code; $read_row_code = sub {
+            return $self->_push_read_packet
+                (label => 'binary resultset row',
+                 timeout => $self->query_packet_timeout)->then (sub {
+              my $packet = $_[0];
+              if (0x00 == unpack 'C', substr ${$packet->{payload_ref}}, 0, 1) {
+                ## <http://dev.mysql.com/doc/internals/en/binary-protocol-resultset-row.html#packet-ProtocolBinary::ResultsetRow>.
+                $packet->{data} = AnyEvent::MySQL::Client::Values->unpack
+                    (\@column, $packet);
+                if (defined $on_row) {
+                  return AnyEvent::MySQL::Client::Promise->resolve->then (sub {
+                    $on_row->(bless {is_success => 1,
+                                     column_packets => \@column,
+                                     packet => $packet},
+                              __PACKAGE__ . '::Result');
+                  })->then ($read_row_code);
+                } else {
+                  return $read_row_code->();
+                }
+              } else {
+                $self->_parse_packet ($packet);
+                if ($packet->{header} == EOF_Packet) {
+                  return bless {is_success => 1,
+                                column_packets => \@column,
+                                packet => $packet}, __PACKAGE__ . '::Result';
+                } else { # Unknown
+                  die bless {is_exception => 1,
+                             message => 'Unexpected packet',
+                             packet => $packet}, __PACKAGE__ . '::Result';
+                }
+              }
+            });
+          };
+          return $read_row_code->();
+        } else {
+          return bless {is_success => 1,
+                        column_packets => \@column,
+                        packet => $_[0]->[-1]}, __PACKAGE__ . '::Result';
+        }
+      });
     } elsif ($packet->{header} == OK_Packet) {
       return bless {is_success => 1,
                     packet => $packet}, __PACKAGE__ . '::Result';
@@ -699,6 +790,70 @@ sub send_statement_execute ($$;$) {
     die $_[0];
   });
 } # send_statement_execute
+
+sub send_statement_close ($$) {
+  my ($self, $statement_id) = @_;
+  return AnyEvent::MySQL::Client::Promise->reject
+      (bless {is_exception => 1,
+              message => 'Not connected'}, __PACKAGE__ . '::Result')
+          unless defined $self->{connect_promise};
+
+  return $self->{command_promise} = $self->{command_promise}->then (sub {
+    my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
+    $packet->_int1 (COM_STMT_CLOSE);
+    $packet->_int4 (0+$statement_id);
+    $packet->_end;
+    $self->_push_send_packet ($packet);
+    $self->{handle}->start_read;
+    return bless {is_success => 1}, __PACKAGE__ . '::Result';
+  })->catch (sub {
+    $self->_terminate_connection;
+    die $_[0];
+  });
+} # send_statement_close
+
+sub send_statement_reset ($$) {
+  my ($self, $statement_id) = @_;
+  return AnyEvent::MySQL::Client::Promise->reject
+      (bless {is_exception => 1,
+              message => 'Not connected'}, __PACKAGE__ . '::Result')
+          unless defined $self->{connect_promise};
+
+  return $self->{command_promise} = $self->{command_promise}->then (sub {
+    my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
+    $packet->_int1 (COM_STMT_RESET);
+    $packet->_int4 (0+$statement_id);
+    $packet->_end;
+    $self->_push_send_packet ($packet);
+    return $self->_push_read_packet
+        (label => 'statement reset command response',
+         timeout => $self->query_packet_timeout);
+  })->then (sub {
+    my $packet = $_[0];
+    die bless {is_exception => 1,
+               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               packet => $packet}, __PACKAGE__ . '::Result'
+                   unless $packet->{sequence_id} == 1;
+    $self->_parse_packet ($packet);
+    if ($packet->{header} == OK_Packet) {
+      return bless {is_success => 1,
+                    packet => $packet}, __PACKAGE__ . '::Result';
+    } elsif ($packet->{header} == ERR_Packet) {
+      return bless {is_failure => 1,
+                    packet => $packet}, __PACKAGE__ . '::Result';
+    } else {
+      die bless {is_exception => 1,
+                 message => 'Unexpected packet',
+                 packet => $packet}, __PACKAGE__ . '::Result';
+    }
+  })->then (sub {
+    $self->{handle}->start_read;
+    return $_[0];
+  }, sub {
+    $self->_terminate_connection;
+    die $_[0];
+  });
+} # send_statement_reset
 
 sub _push_read_packet ($) {
   my ($self, %args) = @_;
@@ -800,8 +955,8 @@ sub _parse_packet ($$) {
            $packet->{payload_length} <= 9-4) {
     ## <http://dev.mysql.com/doc/internals/en/packet-EOF_Packet.html>.
     if ($self->{capabilities} & CLIENT_PROTOCOL_41) {
-      $packet->_string (2 => 'warnings');
-      $packet->_string (2 => 'status_flags');
+      $packet->_int (2 => 'warnings');
+      $packet->_int (2 => 'status_flags');
     }
     $packet->_end;
   } elsif ($packet->{header} == 0xFB) {
@@ -851,13 +1006,13 @@ sub _int_lenenc ($$) {
                    'AnyEvent::MySQL::Client::Result';
   } elsif ($fb eq "\xFC") {
     $_[0]->{$_[1]} = unpack 'v', substr ${$_[0]->{payload_ref}}, $pos + 1, 2;
-    pos (${$_[0]->{payload_ref}}) += 2;
-  } elsif ($fb eq "\xFD") {
-    $_[0]->{$_[1]} = unpack 'V', substr ${$_[0]->{payload_ref}}, $pos + 1, 3;
     pos (${$_[0]->{payload_ref}}) += 3;
+  } elsif ($fb eq "\xFD") {
+    $_[0]->{$_[1]} = unpack 'V', substr (${$_[0]->{payload_ref}}, $pos + 1, 3) . "\x00";
+    pos (${$_[0]->{payload_ref}}) += 4;
   } elsif ($fb eq "\xFE") {
     $_[0]->{$_[1]} = unpack 'Q<', substr ${$_[0]->{payload_ref}}, $pos + 1, 8;
-    pos (${$_[0]->{payload_ref}}) += 8;
+    pos (${$_[0]->{payload_ref}}) += 9;
   } else {
     $_[0]->{$_[1]} = unpack 'C', $fb;
     pos (${$_[0]->{payload_ref}}) += 1;
@@ -918,6 +1073,12 @@ sub _end ($) {
                                      if $_[0]->_has_more_bytes (1);
   delete $_[0]->{payload_ref};
 } # _end
+
+## For debugging
+sub dump ($) {
+  print STDERR join ' ', map { sprintf '%02X', ord $_ } split //, ${$_[0]->{payload_ref}};
+  print STDERR "\n";
+} # dump
 
 package AnyEvent::MySQL::Client::SentPacket;
 use Carp qw(croak);
@@ -1012,7 +1173,7 @@ sub dump ($) {
   print STDERR "\n";
 } # dump
 
-package AnyEvent::MySQL::Client::Params;
+package AnyEvent::MySQL::Client::Values;
 
 ## Column types
 ## <http://dev.mysql.com/doc/internals/en/com-query-response.html#packet-Protocol::ColumnType>
@@ -1044,21 +1205,22 @@ my $TypeNameToTypeID = {
   STRING => 0xFE,
   GEOMETRY => 0xFF,
 };
+my $TypeIDToTypeName = {reverse %$TypeNameToTypeID};
 
 my $TypeIDToValueSyntax = {
   0x00, '_string_lenenc', # DECIMAL
-  0x01, ['_pack', 'c', 'W'], # TINY
-  0x02, ['_pack', 's<', 'v'], # SHORT
-  0x03, ['_pack', 'l<', 'V'], # LONG
-  0x04, ['_pack', 'f<', 'f<'], # FLOAT
-  0x05, ['_pack', 'd<', 'd<'], # DOUBLE
+  0x01, ['_pack', 'c', 'W', 1], # TINY
+  0x02, ['_pack', 's<', 'v', 2], # SHORT
+  0x03, ['_pack', 'l<', 'V', 4], # LONG
+  0x04, ['_pack', 'f<', 'f<', 4], # FLOAT
+  0x05, ['_pack', 'd<', 'd<', 8], # DOUBLE
   0x07, '_timestamp', # TIMESTAMP
-  0x08, ['_pack', 'q<', 'Q<'], # LONGLONG
-  #0x09, ['_pack', 'l<', 'V'], # INT24
+  0x08, ['_pack', 'q<', 'Q<', 8], # LONGLONG
+  #0x09, ['_pack', 'l<', 'V', 4], # INT24
   0x0A, '_timestamp', # DATE
   0x0B, '_time', # TIME
   0x0C, '_timestamp', # DATETIME
-  #0x0D, ['_pack', 's<', 'V'], # YEAR
+  #0x0D, ['_pack', 's<', 'V', 2], # YEAR
   0x0F, '_string_lenenc', # VARCHAR
   0x10, '_string_lenenc', # BIT
   0xF6, '_string_lenenc', # NEWDECIMAL
@@ -1122,6 +1284,35 @@ sub pack ($$) {
   }
   return $out;
 } # pack
+
+sub unpack ($$$) {
+  my ($class, $columns, $packet) = @_;
+  my $null_length = int ((@$columns + 7 + 2) / 8);
+  my $null = unpack 'b*', substr ${$packet->{payload_ref}}, 1, $null_length;
+  pos (${$packet->{payload_ref}}) = 1 + $null_length;
+  my @value;
+  for (0..$#$columns) {
+    my $type = $columns->[$_]->{column_type};
+    my $syntax = $TypeIDToValueSyntax->{$type};
+    die bless {is_error => 1,
+               message => "Unknown type |$type|"},
+                   'AnyEvent::MySQL::Client::Result' unless defined $syntax;
+    my $value = {type => $TypeIDToTypeName->{$type}, value => undef};
+    $value->{unsigned} = 1 if $columns->[$_]->{flags} & AnyEvent::MySQL::Client::UNSIGNED_FLAG;
+    unless (substr $null, 2+$_, 1) {
+      if (ref $syntax) {
+        $packet->_string ($syntax->[3] => '_value');
+        $value->{value} = unpack $value->{unsigned} ? $syntax->[2] : $syntax->[1], delete $packet->{_value};
+      } else {
+        $packet->$syntax ('_value');
+        $value->{value} = delete $packet->{_value};
+      }
+    }
+    push @value, $value;
+  }
+  $packet->_end;
+  return \@value;
+} # unpack
 
 package AnyEvent::MySQL::Client::Result;
 use overload '""' => 'stringify', fallback => 1;
