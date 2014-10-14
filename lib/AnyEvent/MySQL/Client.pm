@@ -566,7 +566,7 @@ sub send_query ($$;$) {
   });
 } # send_query
 
-sub send_prepare ($$) {
+sub send_statement_prepare ($$) {
   my ($self, $query) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
       (bless {is_exception => 1,
@@ -643,9 +643,9 @@ sub send_prepare ($$) {
     $self->_terminate_connection;
     die $_[0];
   });
-} # send_prepare
+} # send_statement_prepare
 
-sub send_execute ($$;$) {
+sub send_statement_execute ($$;$) {
   my ($self, $statement_id, $params) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
       (bless {is_exception => 1,
@@ -698,7 +698,7 @@ sub send_execute ($$;$) {
     $self->_terminate_connection;
     die $_[0];
   });
-} # send_execute
+} # send_statement_execute
 
 sub _push_read_packet ($) {
   my ($self, %args) = @_;

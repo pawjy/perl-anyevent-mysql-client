@@ -16,7 +16,7 @@ my %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
-  $client->send_prepare ('show tables')->then (sub {
+  $client->send_statement_prepare ('show tables')->then (sub {
     test {
       ok 0;
     } $c;
@@ -43,7 +43,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_prepare ('create table foo (id int)')->die;
+    return $client->send_statement_prepare ('create table foo (id int)')->die;
   })->catch (sub {
     return $client->disconnect;
   })->then (sub {
@@ -63,7 +63,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_prepare ('create table foo (id int)');
+    return $client->send_statement_prepare ('create table foo (id int)');
   })->then (sub {
     my $result = $_[0];
     test {
@@ -99,7 +99,7 @@ test {
        database => $dsn{dbname})->then (sub {
     return $client->send_query ('create table foo (id int, name varbinary(19))');
   })->then (sub {
-    return $client->send_prepare ('insert into foo (id, name) values (?, ?)');
+    return $client->send_statement_prepare ('insert into foo (id, name) values (?, ?)');
   })->then (sub {
     my $result = $_[0];
     test {
@@ -134,7 +134,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_prepare ('???');
+    return $client->send_statement_prepare ('???');
   })->then (sub {
     my $result = $_[0];
     test {
@@ -167,7 +167,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_prepare ("\x{5550}???");
+    return $client->send_statement_prepare ("\x{5550}???");
   })->then (sub {
     my $result = $_[0];
     test {

@@ -22,11 +22,11 @@ test {
        database => $dsn{dbname})->then (sub {
     return $client->send_query ('create table foo1 (id int)');
   })->then (sub {
-    return $client->send_prepare ('insert into foo1 (id) values (12)');
+    return $client->send_statement_prepare ('insert into foo1 (id) values (12)');
   })->then (sub {
     my $result = $_[0];
     my $statement_id = $result->packet->{statement_id};
-    return $client->send_execute ($statement_id);
+    return $client->send_statement_execute ($statement_id);
   })->then (sub {
     my $result = $_[0];
     test {
@@ -96,11 +96,11 @@ for my $value (
          database => $dsn{dbname})->then (sub {
       return $client->send_query ("create table foo$x (id int)");
     })->then (sub {
-      return $client->send_prepare ("insert into foo$x (id) values (?)");
+      return $client->send_statement_prepare ("insert into foo$x (id) values (?)");
     })->then (sub {
       my $result = $_[0];
       my $statement_id = $result->packet->{statement_id};
-      return $client->send_execute ($statement_id, [$value]);
+      return $client->send_statement_execute ($statement_id, [$value]);
     })->then (sub {
       my $result = $_[0];
       test {
@@ -144,11 +144,11 @@ test {
        database => $dsn{dbname})->then (sub {
     return $client->send_query ('create table foo6 (id int)');
   })->then (sub {
-    return $client->send_prepare ('insert into foo6 (id) values (12)');
+    return $client->send_statement_prepare ('insert into foo6 (id) values (12)');
   })->then (sub {
     my $result = $_[0];
     my $statement_id = $result->packet->{statement_id};
-    return $client->send_execute ($statement_id, [{type => 'LONG', value => 10}, {type => 'STRING', value => ''}]);
+    return $client->send_statement_execute ($statement_id, [{type => 'LONG', value => 10}, {type => 'STRING', value => ''}]);
   })->then (sub {
     my $result = $_[0];
     test {
@@ -191,11 +191,11 @@ test {
        database => $dsn{dbname})->then (sub {
     return $client->send_query ('create table foo7 (id int)');
   })->then (sub {
-    return $client->send_prepare ('insert into foo7 (id) values (?), (?)');
+    return $client->send_statement_prepare ('insert into foo7 (id) values (?), (?)');
   })->then (sub {
     my $result = $_[0];
     my $statement_id = $result->packet->{statement_id};
-    return $client->send_execute ($statement_id, []);
+    return $client->send_statement_execute ($statement_id, []);
   })->then (sub {
     my $result = $_[0];
     test {
@@ -254,11 +254,11 @@ for my $value (
          database => $dsn{dbname})->then (sub {
       return $client->send_query ("create table foo$x (id int)");
     })->then (sub {
-      return $client->send_prepare ("insert into foo$x (id) values (?)");
+      return $client->send_statement_prepare ("insert into foo$x (id) values (?)");
     })->then (sub {
       my $result = $_[0];
       my $statement_id = $result->packet->{statement_id};
-      return $client->send_execute ($statement_id, [$value]);
+      return $client->send_statement_execute ($statement_id, [$value]);
     })->then (sub {
       my $result = $_[0];
       test {
@@ -302,11 +302,11 @@ for my $value (
          database => $dsn{dbname})->then (sub {
       return $client->send_query ("create table bar$x (id int)");
     })->then (sub {
-      return $client->send_prepare ("insert into bar$x (id) values (?)");
+      return $client->send_statement_prepare ("insert into bar$x (id) values (?)");
     })->then (sub {
       my $result = $_[0];
       my $statement_id = $result->packet->{statement_id};
-      return $client->send_execute ($statement_id, []);
+      return $client->send_statement_execute ($statement_id, []);
     })->then (sub {
       my $result = $_[0];
       test {
@@ -352,11 +352,11 @@ test {
        database => $dsn{dbname})->then (sub {
     return $client->send_query ('create table foo21 (id int, name blob, data tinyint(10))');
   })->then (sub {
-    return $client->send_prepare ('insert into foo21 (name, id, data) values (?, ?, ?)');
+    return $client->send_statement_prepare ('insert into foo21 (name, id, data) values (?, ?, ?)');
   })->then (sub {
     my $result = $_[0];
     my $statement_id = $result->packet->{statement_id};
-    return $client->send_execute ($statement_id, [{type => 'STRING', value => undef}, {type => 'LONG', value => 10}, {type => 'BLOB', value => undef}]);
+    return $client->send_statement_execute ($statement_id, [{type => 'STRING', value => undef}, {type => 'LONG', value => 10}, {type => 'BLOB', value => undef}]);
   })->then (sub {
     my $result = $_[0];
     test {
@@ -399,11 +399,11 @@ test {
        database => $dsn{dbname})->then (sub {
     return $client->send_query ('create table foo22 (id int)');
   })->then (sub {
-    return $client->send_prepare ('insert into foo22 (id) values (?)');
+    return $client->send_statement_prepare ('insert into foo22 (id) values (?)');
   })->then (sub {
     my $result = $_[0];
     my $statement_id = $result->packet->{statement_id};
-    return $client->send_execute ($statement_id, [{type => 'STRING', value => "\x{400}"}]);
+    return $client->send_statement_execute ($statement_id, [{type => 'STRING', value => "\x{400}"}]);
   })->then (sub {
     my $result = $_[0];
     test {
