@@ -144,7 +144,7 @@ sub initialize_promise ($$$) {
   $promise->{promise_fulfill_reactions} = [];
   $promise->{promise_reject_reactions} = [];
   my $resolving_functions = create_resolving_functions $promise, $class;
-  $executor->($resolving_functions->{resolve}, $resolving_functions->{reject});
+  eval { $executor->($resolving_functions->{resolve}, $resolving_functions->{reject}) };
   $resolving_functions->{reject}->($@) if $@;
   return $promise;
 } # initialize_promise

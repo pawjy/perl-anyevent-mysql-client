@@ -226,7 +226,13 @@ C<undef>.
 
 The array reference of the packet objects containing data of the
 columns available, if the result object is a row callback argument or
-a success result of a query method, or C<undef>.
+a success result of a query or prepared statement method, or C<undef>.
+
+=item [$packet1, $packet2, ...] = $result->param_packets
+
+The array reference of the packet objects containing data of the
+parameters available, if the result object is a success result of a
+prepared statement method, or C<undef>.
 
 =item $string = $result->message
 
