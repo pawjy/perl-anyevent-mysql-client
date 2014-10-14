@@ -12,6 +12,16 @@ my $dsn = test_dsn 'hoge';
 $dsn =~ s/^DBI:mysql://i;
 my %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 
+my $USER1 = 'foo';
+my $PASS1 = 'bar';
+Test::MySQL::CreateDatabase::test_dbh_do
+    ('grant all privileges on *.* to "'.$USER1.'"@"localhost" identified by "'.$PASS1.'"');
+
+my $USER2 = "\xFE\x80\x03a";
+my $PASS2 = "\x66\x90\xAC\xFF";
+Test::MySQL::CreateDatabase::test_dbh_do
+    ("grant all privileges on *.* to '".$USER2."'\@'localhost' identified by '".$PASS2."'");
+
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
@@ -25,6 +35,7 @@ test {
       isa_ok $result, 'AnyEvent::MySQL::Client::Result';
       ok $result->is_success;
       isa_ok $result->packet, 'AnyEvent::MySQL::Client::ReceivedPacket';
+      isa_ok $result->handshake_packet, 'AnyEvent::MySQL::Client::ReceivedPacket';
     } $c;
     return $client->send_query (q{create table foo (id int, unique key (id))}, sub {});
   })->then (sub {
@@ -63,7 +74,7 @@ test {
       undef $client;
     } $c;
   });
-} n => 5, name => 'reconnect';
+} n => 6, name => 'reconnect';
 
 test {
   my $c = shift;
@@ -290,7 +301,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname},
-       tls => 1)->then (sub {
+       tls => {})->then (sub {
     test {
       ok 0;
     } $c;
@@ -311,6 +322,334 @@ test {
     } $c;
   });
 } n => 3, name => 'server does not support TLS';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => 'gagewagewaea', password => 'hogefugaaaaafegwat3g',
+       database => $dsn{dbname})->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_exception;
+      is $x->packet->{error_code}, 1045;
+      ok $x->message;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'bad user';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $USER1, password => 'hogefugaaaaafegwat3g',
+       database => $dsn{dbname})->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_exception;
+      is $x->packet->{error_code}, 1045;
+      ok $x->message;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'bad password';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password})->then (sub {
+    my @row;
+    return $client->send_query (q{select current_user()}, sub {
+      push @row, $_[0];
+    })->then (sub { return $row[0]->packet->{data} });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is_deeply $result, [$dsn{user} . '@localhost'];
+    } $c;
+  })->catch (sub {
+    test {
+      ok 0;
+    } $c;
+    return undef;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'login user';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $USER1, password => $PASS1)->then (sub {
+    my @row;
+    return $client->send_query (q{select current_user()}, sub {
+      push @row, $_[0];
+    })->then (sub { return $row[0]->packet->{data} });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is_deeply $result, [$USER1 . '@localhost'];
+    } $c;
+  })->catch (sub {
+    test {
+      ok 0;
+    } $c;
+    return undef;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'user with explicit password';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => "\x{100}", password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_exception;
+      like $x->message, qr{utf8};
+      is $x->packet, undef;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'user is utf8-flagged';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => "\x{5000}",
+       database => $dsn{dbname})->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_exception;
+      like $x->message, qr{utf8};
+      is $x->packet, undef;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'password is utf8-flagged';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => "\x{5000}")->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_exception;
+      like $x->message, qr{utf8};
+      is $x->packet, undef;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'dbname is utf8-flagged';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       character_set => 'default',
+       username => $USER2, password => $PASS2)->then (sub {
+    my @row;
+    return $client->send_query (q{select current_user()}, sub {
+      push @row, $_[0];
+    })->then (sub { return $row[0]->packet->{data} });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is_deeply $result, [$USER2 . '@localhost'];
+    } $c;
+  })->catch (sub {
+    test {
+      ok 0;
+    } $c;
+    return undef;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'non-ascii username and password';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       character_set => 235,
+       username => $USER2, password => $PASS2,
+       database => $dsn{dbname})->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_exception;
+      is $x->packet->{error_code}, 1045;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 2, name => 'username/password charset mismatch';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       character_set => 'utf-12345',
+       username => $USER1, password => $PASS1,
+       database => $dsn{dbname})->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_exception;
+      is $x->packet, undef;
+      like $x->message, qr{char};
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'unknown charset';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => "ho\x00ha", password => $PASS1,
+       database => $dsn{dbname})->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_exception;
+      is $x->packet, undef;
+      like $x->message, qr{NULL};
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+    return undef;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'null user';
 
 run_tests;
 

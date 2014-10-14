@@ -7,17 +7,20 @@ our $VERSION = '1.0';
 require utf8;
 use Scalar::Util qw(weaken);
 use Digest::SHA qw(sha1);
-use Encode qw(encode);
 use AnyEvent::Handle;
 use AnyEvent::MySQL::Client::Promise;
 
 # XXX debug hook
-# XXX password auth
 # XXX prepared
 # XXX new_from_dsn
 # XXX new_from_url
 # XXX transaction
-# XXX charset handling
+
+## Character sets
+## <http://dev.mysql.com/doc/internals/en/character-set.html>.
+sub CHARSET_LATIN1 () { 8 } # latin1_swedish_ci
+sub CHARSET_UTF8 () { 33 } # utf8_general_ci
+sub CHARSET_BINARY () { 63 } # binary
 
 ## Capability flags
 ## <http://dev.mysql.com/doc/internals/en/capability-flags.html>.
@@ -54,10 +57,6 @@ sub EOF_Packet () { 0xFE }
 sub connection_packet_timeout () { 10 }
 sub query_packet_timeout () { 60 }
 
-sub _b ($) {
-  return utf8::is_utf8 ($_[0]) ? encode ('utf-8', $_[0]) : $_[0];
-} # _b
-
 sub new ($) {
   my $class = shift;
   return bless {}, $class;
@@ -69,6 +68,37 @@ sub connect ($%) {
       (bless {is_exception => 1,
               message => 'There is a connection'}, __PACKAGE__ . '::Result')
           if defined $self->{connect_promise};
+
+  for (qw(username password database)) {
+    if (defined $args{$_} and utf8::is_utf8 ($args{$_})) {
+      return AnyEvent::MySQL::Client::Promise->reject
+          (bless {is_exception => 1,
+                  message => "|$_| is utf8-flagged"}, __PACKAGE__ . '::Result');
+    }
+  }
+
+  ## Character set
+  ## <http://dev.mysql.com/doc/refman/5.7/en/charset-connection.html>,
+  ## <http://dev.mysql.com/doc/internals/en/character-set.html>.
+  my $charset = CHARSET_BINARY;
+  if (defined $args{character_set}) {
+    if ($args{character_set} eq 'binary') {
+      #
+    } elsif ($args{character_set} eq 'latin1') {
+      $charset = CHARSET_LATIN1;
+    } elsif ($args{character_set} eq 'utf8') {
+      $charset = CHARSET_UTF8;
+    } elsif ($args{character_set} =~ /\A[0-9]+\z/) {
+      $charset = 0+$args{character_set};
+    } elsif ($args{character_set} eq 'default') {
+      $charset = undef;
+    } else {
+      return AnyEvent::MySQL::Client::Promise->reject
+          (bless {is_exception => 1,
+                  message => "Unknown character set |$args{character_set}|"},
+               __PACKAGE__ . '::Result');
+    }
+  }
 
   my ($ok_close, $ng_close);
   my $promise_close = AnyEvent::MySQL::Client::Promise->new
@@ -129,12 +159,13 @@ sub connect ($%) {
        });
 
   my ($ok_command, $ng_command);
+  my $handshake_packet;
   $self->{command_promise} = AnyEvent::MySQL::Client::Promise->new
       (sub { ($ok_command, $ng_command) = @_ });
   return $self->{connect_promise} = $self->_push_read_packet
       (label => 'initial handshake',
        timeout => $self->connection_packet_timeout)->then (sub {
-    my $packet = $_[0];
+    my $packet = $handshake_packet = $_[0];
 
     $packet->_int (1 => 'version');
     unless ($packet->{version} == 0x0A) {
@@ -151,7 +182,7 @@ sub connect ($%) {
     $packet->_skip (1);
     $packet->_int (2 => 'capability_flags');
     if ($packet->_has_more_bytes) {
-      $packet->_int (1 => 'character_set'); # XXX
+      $packet->_int (1 => 'character_set');
       $packet->_int (2 => 'status_flags');
       $packet->_int (2 => 'capability_flags_2');
       $packet->{capability_flags} |= (delete $packet->{capability_flags_2}) << 16;
@@ -166,6 +197,7 @@ sub connect ($%) {
         $length = 13 if $length < 13;
         $packet->_string ($length => 'auth_plugin_data_2');
         $packet->{auth_plugin_data} .= delete $packet->{auth_plugin_data_2};
+        $packet->{auth_plugin_data} =~ s/\x00\z//;
       }
       if ($packet->{capability_flags} & CLIENT_PLUGIN_AUTH) {
         $packet->_string_null ('auth_plugin_name');
@@ -177,6 +209,8 @@ sub connect ($%) {
         CLIENT_LONG_FLAG | CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 |
         CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION |
         CLIENT_MULTI_STATEMENTS | CLIENT_MULTI_RESULTS;
+    $charset = $packet->{character_set} if not defined $charset;
+    $self->{character_set} = $charset;
 
     if (defined $args{tls}) {
       unless ($packet->{capability_flags} & CLIENT_SSL) {
@@ -199,7 +233,7 @@ sub connect ($%) {
       my $req = AnyEvent::MySQL::Client::SentPacket->new (1);
       $req->_int4 ($self->{capabilities});
       $req->_int4 (0x1_000000);
-      $req->_int1 ($packet->{character_set}); # XXX or
+      $req->_int1 ($charset);
       $req->_null (23);
       $req->_end;
       $self->_push_send_packet ($req);
@@ -213,6 +247,7 @@ sub connect ($%) {
             $tls_ok->([$packet, 2]);
           } else {
             $tls_ng->(bless {is_exception => 1,
+                             handshake_packet => $packet,
                              message => "Can't start TLS: $_[2]"},
                           __PACKAGE__ . '::Result');
           }
@@ -231,13 +266,16 @@ sub connect ($%) {
     my $response = AnyEvent::MySQL::Client::SentPacket->new ($next_id);
     $response->_int4 ($self->{capabilities});
     $response->_int4 (0x1_000000);
-    $response->_int1 ($packet->{character_set}); # XXX or
+    $response->_int1 ($charset);
     $response->_null (23);
-    $response->_string_null (defined $args{username} ? $args{username} : ''); # XXX charset
-    my $password = defined $args{password} ? $args{password} : ''; # XXX charset
+    $response->_string_null (defined $args{username} ? $args{username} : '');
+
+    ## Secure password authentication (|mysql_native_password|)
+    ## <http://dev.mysql.com/doc/internals/en/secure-password-authentication.html>.
+    my $password = defined $args{password} ? $args{password} : '';
     if (length $password) {
-      my $stage1_hash = sha1 ($password);
-      $password = sha1 ($packet->{auth_plugin_data} . sha1 ($stage1_hash)) ^ $stage1_hash;
+      my $sp = sha1 ($password);
+      $password = $sp ^ sha1 ($packet->{auth_plugin_data} . sha1 ($sp));
     }
     if ($self->{capabilities} & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA) {
       $response->_string_lenenc ($password);
@@ -247,8 +285,9 @@ sub connect ($%) {
     } else {
       $response->_string_null ($password);
     }
+
     if ($self->{capabilities} & CLIENT_CONNECT_WITH_DB) {
-      $response->_string_null (defined $args{database} ? $args{database} : ''); # XXX charset
+      $response->_string_null (defined $args{database} ? $args{database} : '');
     }
     #if ($self->{capabilities} & CLIENT_PLUGIN_AUTH) {
     #  $response->_string_null ('(auth plugin name)');
@@ -272,6 +311,7 @@ sub connect ($%) {
     }
     $ok_command->();
     return bless {is_success => 1,
+                  handshake_packet => $handshake_packet,
                   packet => $packet}, __PACKAGE__ . '::Result';
   })->catch (sub {
     my $error = $_[0];
@@ -382,10 +422,19 @@ sub send_query ($$;$) {
       (bless {is_exception => 1,
               message => 'Not connected'}, __PACKAGE__ . '::Result')
           unless defined $self->{connect_promise};
-  $self->{command_promise} = $self->{command_promise}->then (sub {
+
+  if (utf8::is_utf8 ($query)) {
+    return $self->{command_promise} = $self->{command_promise}->then (sub {
+      return bless {is_failure => 1,
+                    message => "Query |$query| is utf8-flagged"},
+                        __PACKAGE__ . '::Result';
+    });
+  }
+
+  return $self->{command_promise} = $self->{command_promise}->then (sub {
     my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
     $packet->_int1 (COM_QUERY);
-    $packet->_string_eof (defined $query ? _b $query : ''); # XXX charset
+    $packet->_string_eof (defined $query ? $query : '');
     $packet->_end;
     $self->_push_send_packet ($packet);
     return $self->_push_read_packet
@@ -760,19 +809,26 @@ sub _int_lenenc ($$) {
 } # _int_lenenc
 
 sub _string_null ($$) {
-  croak "Value contains NULL" if $_[1] =~ /\x00/;
+  die bless {is_exception => 1,
+             message => "Value contains NULL"},
+                 'AnyEvent::MySQL::Client::Result'
+                     if $_[1] =~ /\x00/;
+  croak "Value is utf8-flagged" if utf8::is_utf8 ($_[1]);
   ${$_[0]->{payload_ref}} .= $_[1] . "\x00";
 } # _string_null
 
 sub _string_var ($$) {
+  croak "Value is utf8-flagged" if utf8::is_utf8 ($_[1]);
   ${$_[0]->{payload_ref}} .= $_[1];
 } # _string_var
 
 sub _string_eof ($$) {
+  croak "Value is utf8-flagged" if utf8::is_utf8 ($_[1]);
   ${$_[0]->{payload_ref}} .= $_[1];
 } # _string_eof
 
 sub _string_lenenc ($$) {
+  croak "Value is utf8-flagged" if utf8::is_utf8 ($_[1]);
   $_[0]->_int_lenenc (length $_[1]);
   ${$_[0]->{payload_ref}} .= $_[1];
 } # _string_lenenc
@@ -795,6 +851,7 @@ sub is_failure ($) { $_[0]->{is_failure} }
 sub is_exception ($) { $_[0]->{is_exception} }
 sub packet ($) { $_[0]->{packet} }
 sub column_packets ($) { $_[0]->{column_packets} }
+sub handshake_packet ($) { $_[0]->{handshake_packet} }
 
 sub message ($) {
   my $msg = $_[0]->{message};

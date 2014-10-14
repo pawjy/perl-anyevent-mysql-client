@@ -39,7 +39,7 @@ $dsn =~ s/^DBI:mysql://i;
 my %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 
 my $SSL_USER = 'foo';
-my $SSL_PASS = '';
+my $SSL_PASS = 'bar';
 Test::MySQL::CreateDatabase::test_dbh_do
     ('grant all privileges on *.* to "'.$SSL_USER.'"@"localhost" identified by "'.$SSL_PASS.'" require subject "/CN=client1.test"');
 

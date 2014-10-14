@@ -1,7 +1,6 @@
 AnyEvent::Handle
 Carp
 Digest::SHA
-Encode
 Scalar::Util
 
 ## Promise

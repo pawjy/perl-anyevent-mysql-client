@@ -71,17 +71,37 @@ as L<AnyEvent::TLS>, except that C<verify> option's default is enabled
     cert_file => "path/to/client-cert.pem",
   });
 
+=item character_set => $charset
+
+The MySQL character set used for the connection.  See
+<http://dev.mysql.com/doc/refman/5.7/en/charset-connection.html> for
+more information on the character set of the connection.
+
+If this option is not specified, the C<binary> character set is used.
+Otherwise, if the value C<latin1>, C<utf8>, or C<binary> is specified,
+that character set is used.  Otherwise, if an integer is specified, it
+is used as the character set ID (see
+<http://dev.mysql.com/doc/internals/en/character-set.html>).
+Otherwise, if the value C<default> is specified, the server default
+character set is used.
+
 =item username => $string
 
-The user name for the authorization, if necessary.
+The user name for the authorization, if necessary.  If specified, the
+value must be a byte string encoded in the character encoding
+explicitly or implicily specified by C<character_set>.
 
 =item password => $string
 
-The password for the authorization, if necessary.
+The password for the authorization, if necessary.  If specified, the
+value must be a byte string encoded in the character encoding
+explicitly or implicily specified by C<character_set>.
 
 =item database => $string
 
-The database name to connect.
+The database name to connect.  If specified, the value must be a byte
+string encoded in the character encoding explicitly or implicily
+specified by C<character_set>.
 
 =back
 
@@ -122,7 +142,8 @@ statement).  It returns a promise, which is resolved with the result
 object containing the evaluation result of the specified query.
 
 The first argument must be an SQL statement.  It cannot use the
-placeholder syntax (C<?>).
+placeholder syntax (C<?>).  It must be a byte string encoded in the
+character encoding of the connection.
 
 The second argument, if specified, must be a code reference for the
 row callback.  The code is invoked whenever a resultset is returned
@@ -130,11 +151,13 @@ from the server as part of the response to the query.  It is invoked
 with a result object, whose C<packet> contains a field C<data> which
 is an array reference of values returned by the server (i.e. the
 column values in the row) and whose C<column_packets> contains an
-array reference of packets representing the columns in the row.  The
-row callback can return a promise need to be resolved before continue,
-or can throw an exception.  In other words, it can be used in the same
-way as the fulfill callback of a promise.  Column name/value pairs of
-the rows returned by a query can be enumerated by the following code:
+array reference of packets representing the columns in the row.  Note
+that the values are encoded in the character set of the connection.
+The row callback can return a promise need to be resolved before
+continue, or can throw an exception.  In other words, it can be used
+in the same way as the fulfill callback of a promise.  Column
+name/value pairs of the rows returned by a query can be enumerated by
+the following code:
 
   $client->send_query ('SELECT * FROM table', sub {
     my $row = shift;
@@ -193,9 +216,26 @@ error, descriptions of the error by the server might be retrieved from
 the packet, which is usually a C<ERR_Packet>.  If there is no relevant
 packet (e.g. a TCP error), C<undef> is returned instead.
 
+=item $packet = $result->handshake_packet
+
+The initial handshake packet object received from the server, if the
+result object is a success result of the C<connect> method, or
+C<undef>.
+
+=item [$packet1, $packet2, ...] = $result->column_packets
+
+The array reference of the packet objects containing data of the
+columns available, if the result object is a row callback argument or
+a success result of a query method, or C<undef>.
+
 =item $string = $result->message
 
 A short description of the result, if available, or C<undef>.
+
+Note that this string can contain binary data (if some input used to
+construct the message or an error message from the platform contains
+binary or non-ASCII bytes) or utf8-flagged characters (if some input
+used to construct the message contains them).
 
 =item $string = '' . $result
 

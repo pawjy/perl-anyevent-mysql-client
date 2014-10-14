@@ -3,6 +3,7 @@ use warnings;
 use Path::Tiny;
 use lib glob path (__FILE__)->parent->parent->child ('lib');
 use lib glob path (__FILE__)->parent->parent->child ('t_deps/modules/*/lib');
+use Encode;
 use Test::MySQL::CreateDatabase qw(test_dsn);
 use AnyEvent::MySQL::Client;
 use Test::More;
@@ -220,6 +221,210 @@ test {
     } $c;
   });
 } n => 1, name => 'query with with callback, return promise';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->send_query ("\x{500}");
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      ok $result;
+      isa_ok $result, 'AnyEvent::MySQL::Client::Result';
+      ok $result->is_failure;
+      is $result->packet, undef;
+      like $result->message, qr{utf8};
+    } $c;
+    return $client->send_query ('show tables');
+  })->then (sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_success;
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 6, name => 'query utf8-flagged';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->send_query ('create table foo12 (name VARCHAR(3))');
+  })->then (sub {
+    return $client->send_query (qq{insert into foo12 (name) values ("\xE4\xBD\x8D")});
+  })->then (sub {
+    my $data;
+    return $client->send_query ('select * from foo12', sub {
+      $data = $_[0]->packet->{data}->[0];
+    })->then (sub { return $data });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is $result, "\xE4\xBD\x8D";
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    return $client->connect
+        (hostname => 'unix/', port => $dsn{mysql_socket},
+         character_set => 'utf8',
+         username => $dsn{user}, password => $dsn{password},
+         database => $dsn{dbname});
+  })->then (sub {
+    my $data;
+    return $client->send_query ('select * from foo12', sub {
+      $data = $_[0]->packet->{data}->[0];
+    })->then (sub { return $data });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is $result, encode 'utf-8', "\xE4\xBD\x8D";
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    return $client->connect
+        (hostname => 'unix/', port => $dsn{mysql_socket},
+         character_set => 'latin1',
+         username => $dsn{user}, password => $dsn{password},
+         database => $dsn{dbname});
+  })->then (sub {
+    my $data;
+    return $client->send_query ('select * from foo12', sub {
+      $data = $_[0]->packet->{data}->[0];
+    })->then (sub { return $data });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is $result, "\xE4\xBD\x8D";
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'query non-ascii';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       character_set => 'utf8',
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->send_query ('create table foo13 (name VARCHAR(3)) default charset utf8');
+  })->then (sub {
+    return $client->send_query (qq{insert into foo13 (name) values ("\xE4\xBD\x8D")});
+  })->then (sub {
+    my $data;
+    return $client->send_query ('select * from foo13', sub {
+      $data = $_[0]->packet->{data}->[0];
+    })->then (sub { return $data });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is $result, "\xE4\xBD\x8D";
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    return $client->connect
+        (hostname => 'unix/', port => $dsn{mysql_socket},
+         character_set => 'binary',
+         username => $dsn{user}, password => $dsn{password},
+         database => $dsn{dbname});
+  })->then (sub {
+    my $data;
+    return $client->send_query ('select * from foo13', sub {
+      $data = $_[0]->packet->{data}->[0];
+    })->then (sub { return $data });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is $result, "\xE4\xBD\x8D";
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    return $client->connect
+        (hostname => 'unix/', port => $dsn{mysql_socket},
+         character_set => 'latin1',
+         username => $dsn{user}, password => $dsn{password},
+         database => $dsn{dbname});
+  })->then (sub {
+    my $data;
+    return $client->send_query ('select * from foo13', sub {
+      $data = $_[0]->packet->{data}->[0];
+    })->then (sub { return $data });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is $result, "?";
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'query non-ascii';
 
 run_tests;
 
