@@ -50,13 +50,15 @@ Following name/value pairs must be specified as options:
 
 =item hostname => $string
 
-The ASCII hostname of the server.
+The ASCII hostname (or IP address) of the server for TCP/IP, or
+C<unix/> for Unix domain socket.
 
-=item port => $integer
+=item port => $string
 
-The port number of the server.
+The port number of the server for TCP/IP, or the file name for Unix
+domain socket.
 
-=item tls => {options}
+=item tls => {OPTIONS}
 
 Whether TLS (SSL) is used to connect to the server or not.  If
 specified, the value must be a hash reference, which is used to create
