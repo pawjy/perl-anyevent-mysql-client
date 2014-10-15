@@ -244,6 +244,11 @@ for query command or prepared statement commands) in seconds.
 
 =back
 
+Many methods return promises, which is compatible with (but not an
+instance of) L<Promise> available from
+<https://github.com/wakaba/perl-promise>, which implements similar API
+to JavaScript C<Promise> objects.
+
 =head1 RESULT OBJECT
 
 Most methods of this class returns a promise, which is resolved or
@@ -368,6 +373,12 @@ core modules.
 
 MySQL Internals Manual :: 14 MySQL Client/Server Protocol
 <http://dev.mysql.com/doc/internals/en/client-server-protocol.html>.
+
+=head1 SEE ALSO
+
+L<AnyEvent>.
+
+L<Promise> <https://github.com/wakaba/perl-promise>.
 
 =head1 AUTHOR
 
