@@ -651,6 +651,38 @@ test {
   });
 } n => 3, name => 'null user';
 
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  my $connect_done;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    $connect_done++;
+  }, sub {
+    $connect_done++;
+  });
+  $client->disconnect->then (sub {
+    my $x = $_[0];
+    test {
+      ok $x->is_success;
+      is $connect_done, 1;
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 2, name => 'connect then disconnect soon';
+
 run_tests;
 
 =head1 LICENSE

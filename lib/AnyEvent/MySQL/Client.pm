@@ -363,8 +363,13 @@ sub _terminate_connection ($) {
 sub disconnect ($) {
   my $self = $_[0];
   if (defined $self->{connect_promise}) {
-    $self->{handle}->push_shutdown;
-    $self->{handle}->push_read (sub { return 0 }); # discard
+    $self->{connect_promise}->then (sub {
+      $self->{handle}->push_shutdown;
+      $self->{handle}->push_read (sub { return 0 }); # discard
+    }, sub {
+      $self->{handle}->push_shutdown;
+      $self->{handle}->push_read (sub { return 0 }); # discard
+    });
     return $self->{close_promise}->catch (sub {
       my $result = $_[0];
       if (ref $result and
