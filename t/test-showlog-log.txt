@@ -1,0 +1,8 @@
+runtime:0.01	dsn:DBI:mysql:host=unix/;port=/tmp/a7p4oj2Nyf/tmp/mysql.sock;_use_tls=0;username=root;password=;dbname=hoge_1_test	operation_class:AnyEvent::MySQL::Client	operation_method:connect	caller_file_name:t/../t/basic.t	caller_line:63
+runtime:0.00	dsn:DBI:mysql:host=unix/;port=/tmp/a7p4oj2Nyf/tmp/mysql.sock;_use_tls=0;username=root;password=;dbname=hoge_1_test	operation_class:AnyEvent::MySQL::Client	operation_method:connect	caller_file_name:t/../t/basic.t	caller_line:106
+runtime:0.00	sql:create table foo (id int, unique key (id))	sql_binds:	rows:0	caller_file_name:t/../t/basic.t	caller_line:30
+runtime:0.01	sql:create table foo (id int, unique key (id))	sql_binds:	rows:0	caller_file_name:t/../t/basic.t	caller_line:74
+runtime:0.00	sql:insert into foo (id) values (12)	sql_binds:	rows:1	caller_file_name:t/../t/basic.t	caller_line:32
+runtime:0.00	sql:select id from foo	sql_binds:	rows:0	caller_file_name:t/../t/basic.t	caller_line:37
+runtime:0.00	sql:insert into foo (id) values (?)	sql_binds:(42)	rows:1	caller_file_name:t/../t/basic.t	caller_line:78
+runtime:0.00	sql:insert into hoge (id) values (42)	sql_binds:	rows:0	caller_file_name:t/../t/basic.t	caller_line:80

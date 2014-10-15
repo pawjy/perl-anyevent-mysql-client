@@ -10,8 +10,6 @@ use Digest::SHA qw(sha1);
 use AnyEvent::Handle;
 use AnyEvent::MySQL::Client::Promise;
 
-# XXX debug hook
-
 ## Character sets
 ## <http://dev.mysql.com/doc/internals/en/character-set.html>.
 sub CHARSET_LATIN1 () { 8 } # latin1_swedish_ci
@@ -55,6 +53,10 @@ sub COM_STMT_RESET   () { 0x1A }
 sub OK_Packet  () { 0x00 }
 sub ERR_Packet () { 0xFF }
 sub EOF_Packet () { 0xFE }
+
+our $OnActionInit ||= sub { };
+our $OnActionStart ||= sub { };
+our $OnActionEnd ||= sub { };
 
 sub new ($) {
   my $class = shift;
@@ -114,6 +116,11 @@ sub connect ($%) {
                __PACKAGE__ . '::Result');
     }
   }
+
+  my $action_state = $OnActionInit->(%args, character_set => $charset,
+                                     object => $self,
+                                     action_type => 'connect');
+  $OnActionStart->(state => $action_state);
 
   my ($ok_close, $ng_close);
   my $promise_close = AnyEvent::MySQL::Client::Promise->new
@@ -326,13 +333,16 @@ sub connect ($%) {
                  message => "Failed to connect to server"}, __PACKAGE__ . '::Result';
     }
     $ok_command->();
-    return bless {is_success => 1,
-                  handshake_packet => $handshake_packet,
-                  packet => $packet}, __PACKAGE__ . '::Result';
+    my $result = bless {is_success => 1,
+                        handshake_packet => $handshake_packet,
+                        packet => $packet}, __PACKAGE__ . '::Result';
+    $OnActionEnd->(state => $action_state, result => $result);
+    return $result;
   })->catch (sub {
     my $error = $_[0];
     $self->_terminate_connection;
     $ng_command->();
+    $OnActionEnd->(state => $action_state, result => $error);
     if (defined $self->{close_promise}) {
       return $self->{close_promise}->then (sub { die $error });
     } else {
@@ -514,7 +524,12 @@ sub query ($$;$) {
     });
   }
 
+  my $action_state = $OnActionInit->(query => defined $query ? $query : '',
+                                     object => $self,
+                                     action_type => 'query');
   return $self->{command_promise} = $self->{command_promise}->then (sub {
+    $OnActionStart->(state => $action_state);
+
     my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
     $packet->_int1 (COM_QUERY);
     $packet->_string_eof (defined $query ? $query : '');
@@ -598,9 +613,11 @@ sub query ($$;$) {
     }
   })->then (sub {
     $self->{handle}->start_read;
+    $OnActionEnd->(state => $action_state, result => $_[0]);
     return $_[0];
   }, sub {
     $self->_terminate_connection;
+    $OnActionEnd->(state => $action_state, result => $_[0]);
     die $_[0];
   });
 } # query
@@ -620,7 +637,12 @@ sub statement_prepare ($$) {
     });
   }
 
+  my $action_state = $OnActionInit->(query => defined $query ? $query : '',
+                                     object => $self,
+                                     action_type => 'statement_prepare');
   return $self->{command_promise} = $self->{command_promise}->then (sub {
+    $OnActionStart->(state => $action_state);
+
     my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
     $packet->_int1 (COM_STMT_PREPARE);
     $packet->_string_eof (defined $query ? $query : '');
@@ -681,28 +703,36 @@ sub statement_prepare ($$) {
     }
   })->then (sub {
     $self->{handle}->start_read;
+    $OnActionEnd->(state => $action_state, result => $_[0]);
     return $_[0];
   }, sub {
     $self->_terminate_connection;
+    $OnActionEnd->(state => $action_state, result => $_[0]);
     die $_[0];
   });
 } # statement_prepare
 
 sub statement_execute ($$;$$) {
-  my ($self, $statement_id, $params, $on_row) = @_;
+  my ($self, $statement_id, $params_orig, $on_row) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
       (bless {is_exception => 1,
               message => 'Not connected'}, __PACKAGE__ . '::Result')
           unless defined $self->{connect_promise};
 
-  $params = AnyEvent::MySQL::Client::Values->pack ($params);
+  my $params = AnyEvent::MySQL::Client::Values->pack ($params_orig);
   if (defined $params->{error}) {
     return $self->{command_promise} = $self->{command_promise}->then (sub {
       return $params->{error};
     });
   }
 
+  my $action_state = $OnActionInit->(statement_id => $statement_id,
+                                     params => $params_orig,
+                                     object => $self,
+                                     action_type => 'statement_execute');
   return $self->{command_promise} = $self->{command_promise}->then (sub {
+    $OnActionStart->(state => $action_state);
+
     my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
     $packet->_int1 (COM_STMT_EXECUTE);
     $packet->_int4 (0+$statement_id);
@@ -792,9 +822,11 @@ sub statement_execute ($$;$$) {
     }
   })->then (sub {
     $self->{handle}->start_read;
+    $OnActionEnd->(state => $action_state, result => $_[0]);
     return $_[0];
   }, sub {
     $self->_terminate_connection;
+    $OnActionEnd->(state => $action_state, result => $_[0]);
     die $_[0];
   });
 } # statement_execute

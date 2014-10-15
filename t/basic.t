@@ -63,6 +63,49 @@ test {
   });
 } n => 1;
 
+test {
+  my $c = shift;
+
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->query (q{create table foo (id int, unique key (id))}, sub {});
+  })->then (sub {
+    return $client->statement_prepare (q{insert into foo (id) values (?)}, sub {});
+  })->then (sub {
+    return $client->statement_execute ($_[0]->packet->{statement_id}, [{type => 'LONG', value => 42}]);
+  })->then (sub {
+    return $client->query (q{insert into hoge (id) values (42)});
+  })->then (sub {
+    my $result = $_[0];
+    return $client->quit->then (sub { return $result });
+  })->catch (sub {
+    my $error = $_[0];
+    test {
+      ok 0;
+      is $error, undef;
+    } $c;
+  })->then (sub {
+    my $result = $_[0];
+    return $client->disconnect->then (sub { return $result });
+  })->catch (sub {
+    test {
+      ok 0;
+    } $c;
+    return undef;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      ok 1;
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1;
+
 run_tests;
 
 =head1 LICENSE

@@ -44,16 +44,16 @@ the server, when the client object is ready to accept subsequential
 commands.  The promise is rejected with a result object containing the
 error description if it fails to connect to the server.
 
-Following name/value pairs must be specified as options:
+Following key/value pairs can be specified as options:
 
 =over 4
 
-=item hostname => $string
+=item hostname => $string (REQUIRED)
 
 The ASCII hostname (or IP address) of the server for TCP/IP, or
 C<unix/> for Unix domain socket.
 
-=item port => $string
+=item port => $string (REQUIRED)
 
 The port number of the server for TCP/IP, or the file name for Unix
 domain socket.
@@ -365,6 +365,44 @@ If C<type> is C<TIME>, C<value> must be a string matching to the
 regular expression
 C<\A(-?[0-9]{2,}):([0-9]{2}):([0-9]{2}(?:\.[0-9]{1,6})?)\z> where
 captured values represent hours, minutes, and seconds, respectively.
+
+=head1 HOOKS FOR DEBUGGING
+
+A few callback hooks are provided to implement a development mode,
+where any SQL executions are logged so that application developers can
+inspect operations which have been performed through this module.
+
+The L<AnyEvent::MySQL::Client::ShowLog> module is such an
+implementation that prints C<connect> and SQL execution logs to the
+standard error output.
+
+There are three global variables:
+C<$AnyEvent::MySQL::Client::OnActionInit>,
+C<$AnyEvent::MySQL::Client::OnActionStart>, and
+C<$AnyEvent::MySQL::Client::OnActionEnd>.  Their values must be code
+references.
+
+When an "action" initiates, the C<OnActionInit> callback is invoked
+with parameters as key/value pair arguments.  The C<action_type> value
+identifies the type of the "action", which is corresponding to the
+method name at the moment.  For other parameters, see
+L<AnyEvent::MySQL::Client::ShowLog>'s source code.  The callback can
+return a "state" value.
+
+Then, just before the "action" is actually started, the
+C<OnActionStart> callback is invoked with C<state> key/value pair
+argument, whose value is the "state" value returned by the
+C<OnActionInit> callback.
+
+Finally, when the "action" is completed, the C<OnActionEnd> callback
+is invoked with C<state> and C<result> key/value pair arguments, where
+C<state>'s value is the "state" value returned by the C<OnActionInit>
+callback and C<result>'s value is the result object of the action
+(which the relevant promise of the method that initiated the action is
+to be resolved with).
+
+These callbacks are not expected to throw any exception.  They should
+not use blocking I/O and they should return as soon as possible.
 
 =head1 DEPENDENCY
 
