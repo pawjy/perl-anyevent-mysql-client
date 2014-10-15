@@ -10,11 +10,7 @@ use Digest::SHA qw(sha1);
 use AnyEvent::Handle;
 use AnyEvent::MySQL::Client::Promise;
 
-# XXX time/timestamp types
 # XXX debug hook
-# XXX new_from_dsn
-# XXX new_from_url
-# XXX timeout hooks
 
 ## Character sets
 ## <http://dev.mysql.com/doc/internals/en/character-set.html>.
@@ -60,14 +56,26 @@ sub OK_Packet  () { 0x00 }
 sub ERR_Packet () { 0xFF }
 sub EOF_Packet () { 0xFE }
 
-# XXX
-sub connection_packet_timeout () { 10 }
-sub query_packet_timeout () { 60 }
-
 sub new ($) {
   my $class = shift;
   return bless {}, $class;
 } # new
+
+sub connection_packet_timeout ($;$) {
+  if (@_ > 1) {
+    $_[0]->{connection_packet_timeout} = $_[1];
+  }
+  return $_[0]->{connection_packet_timeout} if defined $_[0]->{connection_packet_timeout};
+  return 10;
+} # connection_packet_timeout
+
+sub query_packet_timeout ($;$) {
+  if (@_ > 1) {
+    $_[0]->{query_packet_timeout} = $_[1];
+  }
+  return $_[0]->{query_packet_timeout} if defined $_[0]->{query_packet_timeout};
+  return 60;
+} # query_packet_timeout
 
 sub connect ($%) {
   my ($self, %args) = @_;
@@ -1099,6 +1107,7 @@ sub _pack ($$$) {
 } # _pack
 
 sub _int1 ($$) { $_[0]->_pack ('C', $_[1]) }
+sub _int2 ($$) { $_[0]->_pack ('v', $_[1]) }
 sub _int4 ($$) { $_[0]->_pack ('V', $_[1]) }
 
 sub _int_lenenc ($$) {
@@ -1116,9 +1125,6 @@ sub _int_lenenc ($$) {
     croak "Bad value $_[1]";
   }
 } # _int_lenenc
-
-# XXX _timestamp
-# XXX _time
 
 sub _string_null ($$) {
   die bless {is_exception => 1,
@@ -1255,7 +1261,7 @@ sub pack ($$) {
     for (@$in) {
       ## <http://dev.mysql.com/doc/internals/en/com-stmt-execute.html>
       my $type = $TypeNameToTypeID->{$_->{type} || ''};
-      die bless {is_error => 1,
+      die bless {is_failure => 1,
                  message => "Unknown type |@{[$_->{type} || '']}|"},
                      'AnyEvent::MySQL::Client::Result'
                          unless defined $type;
@@ -1266,6 +1272,33 @@ sub pack ($$) {
         if (ref $syntax) {
           $values->_pack ($_->{unsigned} ? $syntax->[2] : $syntax->[1],
                           $_->{value});
+        } elsif ($syntax eq '_timestamp') {
+          unless ($_->{value} =~ /\A([0-9]{4})-([0-9]{2})-([0-9]{2})(?: ([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]+)|)|)\z/) {
+            die bless {is_failure => 1,
+                       message => "Timestamp syntax error: |$_->{value}|"},
+                           'AnyEvent::MySQL::Client::Result';
+          }
+          $values->_int1 (11);
+          $values->_int2 ($1);
+          $values->_int1 ($2);
+          $values->_int1 ($3);
+          $values->_int1 ($4 || 0);
+          $values->_int1 ($5 || 0);
+          $values->_int1 ($6 || 0);
+          $values->_int4 (substr ((($7 || 0).'000000'), 0, 6));
+        } elsif ($syntax eq '_time') {
+          unless ($_->{value} =~ /\A(-|)([0-9]{2,}):([0-9]{2}):([0-9]{2})(?:\.([0-9]+)|)\z/) {
+            die bless {is_failure => 1,
+                       message => "Time syntax error: |$_->{value}|"},
+                           'AnyEvent::MySQL::Client::Result';
+          }
+          $values->_int1 (12);
+          $values->_int1 ($1 ? 1 : 0);
+          $values->_int4 (int ($2 / 24));
+          $values->_int1 ($2 % 24);
+          $values->_int1 ($3);
+          $values->_int1 ($4);
+          $values->_int4 (substr ((($5 || 0).'000000'), 0, 6));
         } else {
           $values->$syntax ($_->{value});
         }
@@ -1295,6 +1328,7 @@ sub unpack ($$$) {
     my $type = $columns->[$_]->{column_type};
     my $syntax = $TypeIDToValueSyntax->{$type};
     die bless {is_error => 1,
+               packet => $packet,
                message => "Unknown type |$type|"},
                    'AnyEvent::MySQL::Client::Result' unless defined $syntax;
     my $value = {type => $TypeIDToTypeName->{$type}, value => undef};
@@ -1303,6 +1337,78 @@ sub unpack ($$$) {
       if (ref $syntax) {
         $packet->_string ($syntax->[3] => '_value');
         $value->{value} = unpack $value->{unsigned} ? $syntax->[2] : $syntax->[1], delete $packet->{_value};
+      } elsif ($syntax eq '_timestamp') {
+        $packet->_int (1 => '_length');
+        my $length = delete $packet->{_length};
+        if ($length == 11) {
+          $packet->_int (2 => '_year');
+          $packet->_int (1 => '_month');
+          $packet->_int (1 => '_day');
+          $packet->_int (1 => '_hour');
+          $packet->_int (1 => '_minute');
+          $packet->_int (1 => '_second');
+          $packet->_int (4 => '_microsecond');
+          $value->{value} = sprintf '%04d-%02d-%02d %02d:%02d:%02d.%06d',
+              (delete $value->{_year}), (delete $value->{_month}), (delete $value->{_day}),
+              (delete $value->{_hour}), (delete $value->{_minute}), (delete $value->{_second}),
+              (delete $value->{_microsecond});
+        } elsif ($length == 7) {
+          $packet->_int (2 => '_year');
+          $packet->_int (1 => '_month');
+          $packet->_int (1 => '_day');
+          $packet->_int (1 => '_hour');
+          $packet->_int (1 => '_minute');
+          $packet->_int (1 => '_second');
+          $value->{value} = sprintf '%04d-%02d-%02d %02d:%02d:%02d',
+              (delete $packet->{_year}), (delete $packet->{_month}), (delete $packet->{_day}),
+              (delete $packet->{_hour}), (delete $packet->{_minute}), (delete $packet->{_second});
+        } elsif ($length == 4) {
+          $packet->_int (2 => '_year');
+          $packet->_int (1 => '_month');
+          $packet->_int (1 => '_day');
+          $value->{value} = sprintf '%04d-%02d-%02d 00:00:00',
+              (delete $packet->{_year}), (delete $packet->{_month}), (delete $packet->{_day});
+        } elsif ($length == 0) {
+          $value->{value} = '0000-00-00 00:00:00';
+        } else {
+          die bless {is_error => 1,
+                     packet => $packet,
+                     message => "Unsupported timestamp (length = $length)"},
+                         'AnyEvent::MySQL::Client::Result';
+        }
+      } elsif ($syntax eq '_time') {
+        $packet->_int (1 => '_length');
+        my $length = delete $packet->{_length};
+        if ($length == 12) {
+          $packet->_int (1 => '_is_negative');
+          $packet->_int (4 => '_days');
+          $packet->_int (1 => '_hours');
+          $packet->_int (1 => '_minutes');
+          $packet->_int (1 => '_seconds');
+          $packet->_int (4 => '_microseconds');
+          $value->{value} = sprintf '%s%02d:%02d:%02d.%06d',
+              (delete $packet->{_is_negative} ? '-' : ''),
+              (delete $packet->{_days}) * 24 + (delete $packet->{_hours}),
+              (delete $packet->{_minutes}), (delete $packet->{_seconds}),
+              (delete $packet->{_microseconds});
+        } elsif ($length == 8) {
+          $packet->_int (1 => '_is_negative');
+          $packet->_int (4 => '_days');
+          $packet->_int (1 => '_hours');
+          $packet->_int (1 => '_minutes');
+          $packet->_int (1 => '_seconds');
+          $value->{value} = sprintf '%s%02d:%02d:%02d',
+              (delete $packet->{_is_negative} ? '-' : ''),
+              (delete $packet->{_days}) * 24 + (delete $packet->{_hours}),
+              (delete $packet->{_minutes}), (delete $packet->{_seconds});
+        } elsif ($length == 0) {
+          $value->{value} = '00:00:00';
+        } else {
+          die bless {is_error => 1,
+                     packet => $packet,
+                     message => "Unsupported time (length = $length)"},
+                         'AnyEvent::MySQL::Client::Result';
+        }
       } else {
         $packet->$syntax ('_value');
         $value->{value} = delete $packet->{_value};

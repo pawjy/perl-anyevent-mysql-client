@@ -462,53 +462,61 @@ test {
   });
 } n => 5, name => 'execute ok, redundant placeholder params';
 
-test {
-  my $c = shift;
-  my $client = AnyEvent::MySQL::Client->new;
-  $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
-       username => $dsn{user}, password => $dsn{password},
-       database => $dsn{dbname})->then (sub {
-    return $client->send_query ('create table foo22 (id int)');
-  })->then (sub {
-    return $client->send_statement_prepare ('insert into foo22 (id) values (?)');
-  })->then (sub {
-    my $result = $_[0];
-    my $statement_id = $result->packet->{statement_id};
-    return $client->send_statement_execute ($statement_id, [{type => 'STRING', value => "\x{400}"}]);
-  })->then (sub {
-    my $result = $_[0];
-    test {
-      ok $result;
-      isa_ok $result, 'AnyEvent::MySQL::Client::Result';
-      ok $result->is_failure;
-      is $result->packet, undef;
-      like $result->message, qr{utf8};
-    } $c;
-    my @data;
-    return $client->send_query ('select * from foo22 order by id asc', sub {
-      push @data, $_[0]->packet->{data};
-    })->then (sub { return \@data });
-  })->then (sub {
-    my $result = $_[0];
-    test {
-      is_deeply $result, [];
-    } $c;
-  })->catch (sub {
-    warn $_[0];
-    test {
-      ok 0;
-    } $c;
-  })->then (sub {
-    return $client->disconnect;
-  })->then (sub {
-    test {
-      done $c;
-      undef $c;
-      undef $client;
-    } $c;
-  });
-} n => 6, name => 'utf8-flagged parameter value';
+for my $test (
+  {id => 1, w => {type => 'STRING', value => "\x{400}"}, e => qr/utf8/},
+  {id => 2, w => {type => 'unknown', value => 'hoge'}, e => qr/unknown/},
+  {id => 3, w => {type => 'DATETIME', value => 'hoge'}, e => qr/syntax/},
+  {id => 4, w => {type => 'TIME', value => 'hoge'}, e => qr/syntax/},
+) {
+  test {
+    my $c = shift;
+    my $client = AnyEvent::MySQL::Client->new;
+    my $x = $test->{id} + 500;
+    $client->connect
+        (hostname => 'unix/', port => $dsn{mysql_socket},
+         username => $dsn{user}, password => $dsn{password},
+         database => $dsn{dbname})->then (sub {
+      return $client->send_query ("create table foo$x (id blob)");
+    })->then (sub {
+      return $client->send_statement_prepare ("insert into foo$x (id) values (?)");
+    })->then (sub {
+      my $result = $_[0];
+      my $statement_id = $result->packet->{statement_id};
+      return $client->send_statement_execute ($statement_id, [$test->{w}]);
+    })->then (sub {
+      my $result = $_[0];
+      test {
+        ok $result;
+        isa_ok $result, 'AnyEvent::MySQL::Client::Result';
+        ok $result->is_failure;
+        is $result->packet, undef;
+        like $result->message, $test->{e};
+      } $c;
+      my @data;
+      return $client->send_query ("select * from foo$x order by id asc", sub {
+        push @data, $_[0]->packet->{data};
+      })->then (sub { return \@data });
+    })->then (sub {
+      my $result = $_[0];
+      test {
+        is_deeply $result, [];
+      } $c;
+    })->catch (sub {
+      warn $_[0];
+      test {
+        ok 0;
+      } $c;
+    })->then (sub {
+      return $client->disconnect;
+    })->then (sub {
+      test {
+        done $c;
+        undef $c;
+        undef $client;
+      } $c;
+    });
+  } n => 6, name => ['bad parameter value', $test->{e}];
+}
 
 test {
   my $c = shift;
@@ -588,6 +596,14 @@ for my $test (
   {id => 18, type => 'point', w => 'Point(1, 1)', r => {type => 'GEOMETRY', value => "\x00\x00\x00\x00\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\xF0\x3F\x00\x00\x00\x00\x00\x00\xF0\x3F"}},
   {id => 19, type => 'tinyint unsigned', w => '250', r => {type => 'TINY', value => 250, unsigned => 1}},
   {id => 20, type => 'int unsigned', w => 2**31, r => {type => 'LONG', value => 2**31, unsigned => 1}},
+  {id => 21, type => 'datetime', w => '"0021-04-01 12:22:31"', r => {type => 'DATETIME', value => '0021-04-01 12:22:31'}},
+  {id => 22, type => 'timestamp', w => '"2010-04-01 12:22:31"', r => {type => 'TIMESTAMP', value => '2010-04-01 12:22:31', unsigned => 1}},
+  {id => 23, type => 'date', w => '"2010-04-01"', r => {type => 'DATE', value => '2010-04-01 00:00:00'}},
+  {id => 24, type => 'datetime', w => '"0000-00-00 00:00:00"', r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}},
+  {id => 25, type => 'time', w => '"00:00:00"', r => {type => 'TIME', value => '00:00:00'}},
+  {id => 26, type => 'time', w => '"812:02:44"', r => {type => 'TIME', value => '812:02:44'}},
+  {id => 27, type => 'time', w => '"-812:02:01"', r => {type => 'TIME', value => '-812:02:01'}},
+  {id => 28, type => 'time', w => '"-12:02:01"', r => {type => 'TIME', value => '-12:02:01'}},
 ) {
   test {
     my $c = shift;
@@ -631,6 +647,69 @@ for my $test (
       } $c;
     });
   } n => 1, name => ['receive value', $test->{type}];
+}
+
+for my $test (
+  {id => 1, type => 'datetime', w => {type => 'DATETIME', value => "0021-04-01 12:22:31"}, r => {type => 'DATETIME', value => '0021-04-01 12:22:31'}},
+  {id => 2, type => 'timestamp', w => {type => 'TIMESTAMP', value => "2010-04-01 12:22:31"}, r => {type => 'TIMESTAMP', value => '2010-04-01 12:22:31', unsigned => 1}},
+  {id => 3, type => 'date', w => {type => 'DATE', value => "2010-04-01"}, r => {type => 'DATE', value => '2010-04-01 00:00:00'}},
+  {id => 4, type => 'datetime', w => {type => 'DATETIME', value => "0000-00-00 00:00:00"}, r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}},
+  {id => 5, type => 'datetime', w => {type => 'DATETIME', value => "8000-99-99 99:99:99"}, r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}},
+  {id => 25, type => 'time', w => {type => 'TIME', value => "00:00:00"}, r => {type => 'TIME', value => '00:00:00'}},
+  {id => 26, type => 'time', w => {type => 'TIME', value => "812:02:44"}, r => {type => 'TIME', value => '812:02:44'}},
+  {id => 27, type => 'time', w => {type => 'TIME', value => "-812:02:01"}, r => {type => 'TIME', value => '-812:02:01'}},
+  {id => 28, type => 'time', w => {type => 'TIME', value => "-12:02:01"}, r => {type => 'TIME', value => '-12:02:01'}},
+  {id => 29, type => 'time', w => {type => 'TIME', value => "-99:99:99"}, r => {type => 'TIME', value => '00:00:00'}},
+) {
+  test {
+    my $c = shift;
+    my $client = AnyEvent::MySQL::Client->new;
+    my $x = $test->{id} + 400;
+    $client->connect
+        (hostname => 'unix/', port => $dsn{mysql_socket},
+         username => $dsn{user}, password => $dsn{password},
+         database => $dsn{dbname})->then (sub {
+      return $client->send_query ("create table foo$x (value $test->{type})");
+    })->then (sub {
+      return $client->send_statement_prepare ("insert into foo$x (value) values (?)");
+    })->then (sub {
+      return $client->send_statement_execute
+          ($_[0]->packet->{statement_id}, [$test->{w}]);
+    })->then (sub {
+      my $y = $_[0];
+      test {
+        ok $y->is_success;
+      } $c;
+      return $client->send_statement_prepare ("select * from foo$x");
+    })->then (sub {
+      my $result = $_[0];
+      my $statement_id = $result->packet->{statement_id};
+      my @row;
+      return $client->send_statement_execute ($statement_id, [], sub {
+        push @row, $_[0];
+      })->then (sub { [$_[0], \@row] });
+    })->then (sub {
+      my ($result, $rows) = @{$_[0]};
+      test {
+        is_deeply [map { $_->packet->{data} } @$rows], [[$test->{r}]];
+      } $c;
+    })->then (sub {
+      return $client->send_query ('show tables');
+    })->catch (sub {
+      warn $_[0];
+      test {
+        ok 0;
+      } $c;
+    })->then (sub {
+      return $client->disconnect;
+    })->then (sub {
+      test {
+        done $c;
+        undef $c;
+        undef $client;
+      } $c;
+    });
+  } n => 2, name => ['send/receive value', $test->{type}];
 }
 
 run_tests;
