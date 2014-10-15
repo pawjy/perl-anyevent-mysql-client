@@ -1215,7 +1215,7 @@ my $TypeIDToTypeName = {reverse %$TypeNameToTypeID};
 
 my $TypeIDToValueSyntax = {
   0x00, '_string_lenenc', # DECIMAL
-  0x01, ['_pack', 'c', 'W', 1], # TINY
+  0x01, ['_pack', 'c', 'C', 1], # TINY
   0x02, ['_pack', 's<', 'v', 2], # SHORT
   0x03, ['_pack', 'l<', 'V', 4], # LONG
   0x04, ['_pack', 'f<', 'f<', 4], # FLOAT
