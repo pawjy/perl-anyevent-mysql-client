@@ -182,6 +182,37 @@ test {
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
+  $client->connect->then (sub {
+    test {
+      ok 0;
+    } $c;
+  }, sub {
+    my $x = $_[0];
+    test {
+      isa_ok $x, 'AnyEvent::MySQL::Client::Result';
+      ok $x->is_exception;
+      ok $x->message;
+    } $c;
+    return $client->disconnect->then (sub {
+      my $y = $_[0];
+      test {
+        ok $y;
+        isa_ok $y, 'AnyEvent::MySQL::Client::Result';
+        ok $y->is_success;
+      } $c;
+    });
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 6, name => 'no host';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
   $client->connect
       (hostname => 'dummy.localdomain', port => 1122224)->then (sub {
     test {
