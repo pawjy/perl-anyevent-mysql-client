@@ -366,8 +366,8 @@ captured values represent hours, minutes, and seconds, respectively.
 
 =head1 DEPENDENCY
 
-Perl 5.10 or later and L<AnyEvent> is required.  It also requires some
-core modules.
+The module requires Perl 5.10 or later and L<AnyEvent>.  It also
+requires some core modules.
 
 =head1 SPECIFICATION
 
