@@ -127,7 +127,7 @@ sub connect ($%) {
       (sub { ($ok_close, $ng_close) = @_ });
   $self->{close_promise} = $promise_close;
 
-  $self->{handle} = AnyEvent::Handle->new
+  $self->{handle} = eval { AnyEvent::Handle->new
       (connect => [$args{hostname}, $args{port}],
        no_delay => 1,
        wtimeout => $self->query_packet_timeout,
@@ -179,7 +179,13 @@ sub connect ($%) {
          delete $self->{connect_promise};
          delete $self->{command_promise};
          delete $self->{close_promise};
-       });
+       }) };
+  if ($@) {
+    delete $self->{close_promise};
+    return AnyEvent::MySQL::Client::Promise->reject
+        (bless {is_exception => 1,
+                message => $@}, __PACKAGE__ . '::Result');
+  }
 
   my ($ok_command, $ng_command);
   my $handshake_packet;
