@@ -37,9 +37,9 @@ test {
       isa_ok $result->packet, 'AnyEvent::MySQL::Client::ReceivedPacket';
       isa_ok $result->handshake_packet, 'AnyEvent::MySQL::Client::ReceivedPacket';
     } $c;
-    return $client->send_query (q{create table foo (id int, unique key (id))}, sub {});
+    return $client->query (q{create table foo (id int, unique key (id))}, sub {});
   })->then (sub {
-    return $client->send_query (q{insert into foo (id) values (12)}, sub {});
+    return $client->query (q{insert into foo (id) values (12)}, sub {});
   })->then (sub {
     return $client->disconnect;
   })->then (sub {
@@ -49,7 +49,7 @@ test {
          database => $dsn{dbname});
   })->then (sub {
     my @row;
-    return $client->send_query (q{select id from foo}, sub {
+    return $client->query (q{select id from foo}, sub {
       push @row, $_[0];
     })->then (sub { return $row[0]->packet->{data}->[0] });
   })->then (sub {
@@ -125,7 +125,7 @@ test {
       } $c;
     });
   })->then (sub {
-    return $client->send_ping;
+    return $client->ping;
   })->then (sub {
     my $result = $_[0];
     test {
@@ -154,7 +154,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password})->then (sub {
     my @row;
-    return $client->send_query (q{show databases}, sub {
+    return $client->query (q{show databases}, sub {
       push @row, $_[0];
     })->then (sub { return scalar @row });
   })->then (sub {
@@ -279,7 +279,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_ping->DIE;
+    return $client->ping->DIE;
   })->catch (sub {
     return $client->disconnect;
   })->then (sub {
@@ -386,7 +386,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password})->then (sub {
     my @row;
-    return $client->send_query (q{select current_user()}, sub {
+    return $client->query (q{select current_user()}, sub {
       push @row, $_[0];
     })->then (sub { return $row[0]->packet->{data} });
   })->then (sub {
@@ -418,7 +418,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $USER1, password => $PASS1)->then (sub {
     my @row;
-    return $client->send_query (q{select current_user()}, sub {
+    return $client->query (q{select current_user()}, sub {
       push @row, $_[0];
     })->then (sub { return $row[0]->packet->{data} });
   })->then (sub {
@@ -535,7 +535,7 @@ test {
        character_set => 'default',
        username => $USER2, password => $PASS2)->then (sub {
     my @row;
-    return $client->send_query (q{select current_user()}, sub {
+    return $client->query (q{select current_user()}, sub {
       push @row, $_[0];
     })->then (sub { return $row[0]->packet->{data} });
   })->then (sub {

@@ -27,17 +27,17 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_query (q{create table foo (id int, unique key (id))}, sub {});
+    return $client->query (q{create table foo (id int, unique key (id))}, sub {});
   })->then (sub {
-    return $client->send_query (q{insert into foo (id) values (12)}, sub {});
+    return $client->query (q{insert into foo (id) values (12)}, sub {});
   })->then (sub {
     my @row;
-    return $client->send_query (q{select id from foo}, sub {
+    return $client->query (q{select id from foo}, sub {
       push @row, $_[0];
     })->then (sub { return $row[0]->packet->{data}->[0] });
   })->then (sub {
     my $result = $_[0];
-    return $client->send_quit->then (sub { return $result });
+    return $client->quit->then (sub { return $result });
   })->catch (sub {
     my $error = $_[0];
     test {

@@ -19,7 +19,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_ping;
+    return $client->ping;
   })->then (sub {
     my $result = $_[0];
     test {
@@ -45,7 +45,7 @@ test {
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
-  $client->send_ping->then (sub {
+  $client->ping->then (sub {
     my $result = $_[0];
     test {
       ok not $result;
@@ -72,7 +72,7 @@ test {
     my $result = $_[0];
     return $client->disconnect->then (sub { return $result });
   })->then (sub {
-    return $client->send_ping;
+    return $client->ping;
   })->then (sub {
     my $result = $_[0];
     test {

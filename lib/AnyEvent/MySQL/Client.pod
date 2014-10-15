@@ -10,10 +10,10 @@ AnyEvent::MySQL::Client - A low-level MySQL client API
       (hostname => $hostname, port => $port,
        username => $username, password => $password,
        database => $dbname)->then (sub {
-    return $client->send_query ('insert into hoge (id) values (12)');
+    return $client->query ('insert into hoge (id) values (12)');
   })->then (sub {
     die $_[0] if $_[0]->is_failure;
-    return $client->send_query ('insert into fuga (id) values (56)');
+    return $client->query ('insert into fuga (id) values (56)');
   })->catch (sub {
     warn $_[0];
   })->then (sub {
@@ -117,7 +117,7 @@ connection is closed.  If there is no connection, the promise is
 immediately resolved.  That is, this method might be invoked even when
 there is no connection.
 
-=item $promise = $client->send_quit
+=item $promise = $client->quit
 
 Send a C<COM_QUIT> command, which will let the server close the
 connection.  It returns a promise, which is resolved with a success
@@ -125,7 +125,7 @@ result object when the connection is closed.  If there is no
 connection, the promise is immediately resolved.  That is, this method
 might be invoked even when there is no connection.
 
-=item $promise = $client->send_ping
+=item $promise = $client->ping
 
 Send a C<COM_PING> command.  It returns a promise, which is resolved
 with a true value when the server responds to the command.  If the
@@ -135,7 +135,7 @@ promise is resolved with a false value.
 Note that the promise returned by this method is resolved with a
 boolean value unlike other methods of this class.
 
-=item $promise = $client->send_query ($query[, $row_callback])
+=item $promise = $client->query ($query[, $row_callback])
 
 Send a C<COM_QUERY> command with the specified query (an SQL
 statement).  It returns a promise, which is resolved with the result
@@ -159,7 +159,7 @@ in the same way as the fulfill callback of a promise.  Column
 name/value pairs of the rows returned by a query can be enumerated by
 the following code:
 
-  $client->send_query ('SELECT * FROM table', sub {
+  $client->query ('SELECT * FROM table', sub {
     my $row = shift;
     my @col = map { $_->{name} } @{$row->column_packets};
     my $data = $row->packet->{data};
@@ -179,7 +179,7 @@ never been invoked.  Note that additional information on query such as
 affected row count might be available in the C<packet> of a success
 result object.
 
-=item $promise = $client->send_statement_prepare ($query)
+=item $promise = $client->statement_prepare ($query)
 
 Send a C<COM_STMT_PREPARE> command with the specified query (an SQL
 statement).  It returns a promise, which is resolved with the result
@@ -193,7 +193,7 @@ If the returned promise is resolved with a I<success> return object,
 the statement ID of the statement prepared can be accessed by C<<
 $result->packet->{statement_id} >>.
 
-=item $promise = $client->send_statement_execute ($statement_id, [$value1, $value2, ...][, $on_row])
+=item $promise = $client->statement_execute ($statement_id, [$value1, $value2, ...][, $on_row])
 
 Send a C<COM_STMT_EXECUTE> command with the specified parameters
 (i.e. the arguments to the prepared statement's placeholders).  It
@@ -208,7 +208,7 @@ array reference containing typed values (see L</TYPED VALUES>)
 representing parameters in order, possibly empty.
 
 The third argument, if specified, must be a code reference, which is
-the row callback similar to C<send_query> method's argument, except
+the row callback similar to C<query> method's argument, except
 that the items of C<< @{$_[0]->packet->{data}} >> are typed values
 representing columns in the row.
 
@@ -216,13 +216,13 @@ The promise returned by the method is resolved with the result object
 for the entire query, similar to the returned promise of the C<query>
 method.
 
-=item $promise = $client->send_statement_close ($statement_id)
+=item $promise = $client->statement_close ($statement_id)
 
 Send a C<COM_STMT_CLOSE> command with the specified statement ID.  It
 returns a promise, which is resolved with the result object containing
 whether the command has succeeded or not.
 
-=item $promise = $client->send_statement_reset ($statement_id)
+=item $promise = $client->statement_reset ($statement_id)
 
 Send a C<COM_STMT_RESET> command with the specified statement ID.  It
 returns a promise, which is resolved with the result object containing

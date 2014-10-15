@@ -16,7 +16,7 @@ my %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
-  $client->send_statement_close (124)->then (sub {
+  $client->statement_close (124)->then (sub {
     test {
       ok 0;
     } $c;
@@ -43,9 +43,9 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_statement_prepare ('create table foo0 (id int)');
+    return $client->statement_prepare ('create table foo0 (id int)');
   })->then (sub {
-    return $client->send_statement_close ($_[0]->packet->{statement_id})->die;
+    return $client->statement_close ($_[0]->packet->{statement_id})->die;
   })->catch (sub {
     test {
       ok 1;
@@ -68,7 +68,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_statement_close;
+    return $client->statement_close;
   })->catch (sub {
     my $x = $_[0];
     test {
@@ -93,13 +93,13 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_query ('create table foo1 (id int)');
+    return $client->query ('create table foo1 (id int)');
   })->then (sub {
-    return $client->send_statement_prepare ('insert into foo1 (id) values (12)');
+    return $client->statement_prepare ('insert into foo1 (id) values (12)');
   })->then (sub {
     my $result = $_[0];
     $statement_id = $result->packet->{statement_id};
-    return $client->send_statement_close ($statement_id);
+    return $client->statement_close ($statement_id);
   })->then (sub {
     my $result = $_[0];
     test {
@@ -109,7 +109,7 @@ test {
       is $result->packet, undef;
     } $c;
   })->then (sub {
-    return $client->send_statement_execute ($statement_id);
+    return $client->statement_execute ($statement_id);
   })->then (sub {
     my $x = $_[0];
     test {
@@ -117,7 +117,7 @@ test {
       is $x->packet->{error_code}, 1243;
     } $c;
     my $data;
-    return $client->send_query ('select * from foo1', sub {
+    return $client->query ('select * from foo1', sub {
       $data = $_[0]->packet->{data};
     })->then (sub { return $data });
   })->then (sub {
@@ -149,13 +149,13 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_query ('create table foo2 (id int)');
+    return $client->query ('create table foo2 (id int)');
   })->then (sub {
-    return $client->send_statement_prepare ('insert into foo2 (id) values (12)');
+    return $client->statement_prepare ('insert into foo2 (id) values (12)');
   })->then (sub {
     my $result = $_[0];
     $statement_id = $result->packet->{statement_id};
-    return $client->send_statement_close ($statement_id + 30);
+    return $client->statement_close ($statement_id + 30);
   })->then (sub {
     my $result = $_[0];
     test {
@@ -165,14 +165,14 @@ test {
       is $result->packet, undef;
     } $c;
   })->then (sub {
-    return $client->send_statement_execute ($statement_id);
+    return $client->statement_execute ($statement_id);
   })->then (sub {
     my $x = $_[0];
     test {
       ok 1;
     } $c;
     my $data;
-    return $client->send_query ('select * from foo2', sub {
+    return $client->query ('select * from foo2', sub {
       $data = $_[0]->packet->{data};
     })->then (sub { return $data });
   })->then (sub {

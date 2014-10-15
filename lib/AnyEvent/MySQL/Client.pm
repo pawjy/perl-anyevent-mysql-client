@@ -374,7 +374,7 @@ sub disconnect ($) {
   }
 } # disconnect
 
-sub send_quit ($) {
+sub quit ($) {
   my ($self) = @_;
   return AnyEvent::MySQL::Client::Promise->new
       (sub { $_[0]->(bless {is_success => 1,
@@ -417,9 +417,9 @@ sub send_quit ($) {
       return $self->disconnect->then (sub { die $result });
     }
   });
-} # send_quit
+} # quit
 
-sub send_ping ($) {
+sub ping ($) {
   my ($self) = @_;
   return AnyEvent::MySQL::Client::Promise->new (sub { $_[0]->(0) })
       unless defined $self->{connect_promise};
@@ -451,7 +451,7 @@ sub send_ping ($) {
     $self->_terminate_connection;
     return 0;
   });
-} # send_ping
+} # ping
 
 my $ReadEOFPacket = sub ($) {
   my $self = $_[0];
@@ -499,7 +499,7 @@ my $ReadColumnDefinition = sub ($$) {
   });
 }; # $ReadColumnDefinition
 
-sub send_query ($$;$) {
+sub query ($$;$) {
   my ($self, $query, $on_row) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
       (bless {is_exception => 1,
@@ -603,9 +603,9 @@ sub send_query ($$;$) {
     $self->_terminate_connection;
     die $_[0];
   });
-} # send_query
+} # query
 
-sub send_statement_prepare ($$) {
+sub statement_prepare ($$) {
   my ($self, $query) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
       (bless {is_exception => 1,
@@ -686,9 +686,9 @@ sub send_statement_prepare ($$) {
     $self->_terminate_connection;
     die $_[0];
   });
-} # send_statement_prepare
+} # statement_prepare
 
-sub send_statement_execute ($$;$$) {
+sub statement_execute ($$;$$) {
   my ($self, $statement_id, $params, $on_row) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
       (bless {is_exception => 1,
@@ -797,9 +797,9 @@ sub send_statement_execute ($$;$$) {
     $self->_terminate_connection;
     die $_[0];
   });
-} # send_statement_execute
+} # statement_execute
 
-sub send_statement_close ($$) {
+sub statement_close ($$) {
   my ($self, $statement_id) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
       (bless {is_exception => 1,
@@ -818,9 +818,9 @@ sub send_statement_close ($$) {
     $self->_terminate_connection;
     die $_[0];
   });
-} # send_statement_close
+} # statement_close
 
-sub send_statement_reset ($$) {
+sub statement_reset ($$) {
   my ($self, $statement_id) = @_;
   return AnyEvent::MySQL::Client::Promise->reject
       (bless {is_exception => 1,
@@ -861,7 +861,7 @@ sub send_statement_reset ($$) {
     $self->_terminate_connection;
     die $_[0];
   });
-} # send_statement_reset
+} # statement_reset
 
 sub _push_read_packet ($) {
   my ($self, %args) = @_;

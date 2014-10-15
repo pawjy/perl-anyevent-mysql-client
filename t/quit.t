@@ -19,7 +19,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_quit;
+    return $client->quit;
   })->then (sub {
     my $x = shift;
     test {
@@ -35,7 +35,7 @@ test {
       ok 0;
     } $c;
   })->then (sub {
-    return $client->send_ping;
+    return $client->ping;
   })->then (sub {
     my $result = $_[0];
     test {
@@ -50,7 +50,7 @@ test {
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
-  $client->send_quit->then (sub {
+  $client->quit->then (sub {
     my $x = shift;
     test {
       ok $x;
@@ -65,7 +65,7 @@ test {
       ok 0;
     } $c;
   })->then (sub {
-    return $client->send_ping;
+    return $client->ping;
   })->then (sub {
     my $result = $_[0];
     test {
@@ -83,7 +83,7 @@ test {
       (hostname => 'unix/', port => $dsn{mysql_socket},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
-    return $client->send_quit->DIE;
+    return $client->quit->DIE;
   })->catch (sub {
     return $client->disconnect;
   })->then (sub {

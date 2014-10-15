@@ -125,7 +125,7 @@ test {
       ok $x->packet;
     } $c;
     my $data;
-    return $client->send_query ('SHOW STATUS LIKE "Ssl_cipher"', sub {
+    return $client->query ('SHOW STATUS LIKE "Ssl_cipher"', sub {
       $data = $_[0]->packet->{data};
     })->then (sub {
       my @col = map { $_->{name} } @{$_[0]->column_packets};
@@ -201,7 +201,7 @@ test {
       ok $x->packet;
     } $c;
     my $data;
-    return $client->send_query ('SHOW STATUS LIKE "Ssl_cipher"', sub {
+    return $client->query ('SHOW STATUS LIKE "Ssl_cipher"', sub {
       $data = $_[0]->packet->{data};
     })->then (sub {
       my @col = map { $_->{name} } @{$_[0]->column_packets};
@@ -247,7 +247,7 @@ test {
       ok $x->packet;
     } $c;
     my $data;
-    return $client->send_query ('SHOW STATUS LIKE "Ssl_cipher"', sub {
+    return $client->query ('SHOW STATUS LIKE "Ssl_cipher"', sub {
       $data = $_[0]->packet->{data};
     })->then (sub {
       my @col = map { $_->{name} } @{$_[0]->column_packets};
