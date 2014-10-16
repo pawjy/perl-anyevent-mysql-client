@@ -855,7 +855,7 @@ sub statement_close ($$) {
     $packet->_int4 (0+$statement_id);
     $packet->_end;
     $self->_push_send_packet ($packet);
-    $self->{handle}->start_read;
+    $self->{handle}->start_read if $self->{handle};
     return bless {is_success => 1}, __PACKAGE__ . '::Result';
   })->catch (sub {
     $self->_terminate_connection;

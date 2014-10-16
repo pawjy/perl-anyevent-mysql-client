@@ -196,6 +196,80 @@ test {
   });
 } n => 6, name => 'close not exist';
 
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  my $statement_id;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->query ('create table foo1 (id int)');
+  })->then (sub {
+    return $client->statement_prepare ('insert into foo1 (id) values (12)');
+  })->then (sub {
+    my $result = $_[0];
+    $statement_id = $result->packet->{statement_id};
+    $client->statement_close ($statement_id);
+    return $client->disconnect;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      ok $result;
+      isa_ok $result, 'AnyEvent::MySQL::Client::Result';
+      ok $result->is_success;
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'close then soon disconnect';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  my $statement_id;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       username => $dsn{user}, password => $dsn{password},
+       database => $dsn{dbname})->then (sub {
+    return $client->query ('create table foo1 (id int)');
+  })->then (sub {
+    return $client->statement_prepare ('insert into foo1 (id) values (12)');
+  })->then (sub {
+    my $result = $_[0];
+    $statement_id = $result->packet->{statement_id};
+    $client->disconnect;
+    return $client->statement_close ($statement_id);
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      ok $result;
+      isa_ok $result, 'AnyEvent::MySQL::Client::Result';
+      ok $result->is_success;
+    } $c;
+  })->catch (sub {
+    warn $_[0];
+    test {
+      ok 0;
+    } $c;
+  })->then (sub {
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 3, name => 'disconnect then soon close';
+
 run_tests;
 
 =head1 LICENSE
