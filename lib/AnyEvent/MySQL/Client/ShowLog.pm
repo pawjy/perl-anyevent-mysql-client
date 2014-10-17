@@ -106,7 +106,7 @@ sub show_result ($$) {
   if ($self->{action_type} eq 'query') {
     $SQLCount++ if $COUNT;
     $self->carp (sprintf "runtime:%.2f\tsql:%s\tsql_binds:%s\trows:%d",
-                 $self->{end_time} - $self->{start_time},
+                 ($self->{end_time} - $self->{start_time}) * 1000,
                  _ltsv_escape $self->{query},
                  _ltsv_escape '',
                  (defined $result && defined $result->packet ? $result->packet->{affected_rows} || 0 : 0))
@@ -118,7 +118,7 @@ sub show_result ($$) {
   } elsif ($self->{action_type} eq 'statement_execute') {
     $SQLCount++ if $COUNT;
     $self->carp (sprintf "runtime:%.2f\tsql:%s\tsql_binds:%s\trows:%d",
-                 $self->{end_time} - $self->{start_time},
+                 ($self->{end_time} - $self->{start_time}) * 1000,
                  _ltsv_escape ($StatementIDToSQL->{$self->{object}, $self->{statement_id}} // ''),
                  _ltsv_escape '('.(join ', ', map { $_->{value} // '(undef)' } @{$self->{params}}).')',
                  (defined $result && defined $result->packet ? $result->packet->{affected_rows} || 0 : 0))
@@ -134,7 +134,7 @@ sub show_result ($$) {
           $self->{database};
       $self->carp (with_color 'bright_black',
                    sprintf "runtime:%.2f\tdsn:%s\toperation_class:%s\toperation_method:%s",
-                   $self->{end_time} - $self->{start_time},
+                   ($self->{end_time} - $self->{start_time}) * 1000,
                    _ltsv_escape $dsn,
                    $self->{class},
                    $self->{action_type});
