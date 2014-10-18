@@ -2,7 +2,7 @@ package AnyEvent::MySQL::Client::Promise;
 use strict;
 use warnings;
 use warnings FATAL => 'uninitialized';
-our $VERSION = '1.0';
+our $VERSION = '2.0';
 
 our $CreateTypeError ||= sub ($$) {
   require Carp;
@@ -144,6 +144,7 @@ sub initialize_promise ($$$) {
   $promise->{promise_fulfill_reactions} = [];
   $promise->{promise_reject_reactions} = [];
   my $resolving_functions = create_resolving_functions $promise, $class;
+  local $@;
   eval { $executor->($resolving_functions->{resolve}, $resolving_functions->{reject}) };
   $resolving_functions->{reject}->($@) if $@;
   return $promise;
