@@ -3,19 +3,24 @@ use strict;
 use warnings;
 use warnings FATAL => 'uninitialized';
 our $VERSION = '2.0';
+use Carp;
 
-our $CreateTypeError ||= sub ($$) {
-  require Carp;
+sub _get_caller () {
+  return scalar Carp::caller_info
+      (Carp::short_error_loc() || Carp::long_error_loc());
+} # _get_caller
+
+$Promise::CreateTypeError ||= sub ($$) {
   return "TypeError: " . $_[1] . Carp::shortmess ();
 };
-sub _type_error ($$) { $CreateTypeError->(@_) }
+sub _type_error ($$) { $Promise::CreateTypeError->(@_) }
 
-our $Enqueue = sub ($$) {
+$Promise::Enqueue = sub ($$) {
   my $code = $_[1];
   require AnyEvent;
   AE::postpone (sub { $code->() });
 };
-sub _enqueue ($$) { $Enqueue->(@_) }
+sub _enqueue ($$) { $Promise::Enqueue->(@_) }
 
 sub enqueue_promise_reaction_job ($$$) {
   my ($reaction, $argument, $class) = @_;
@@ -127,7 +132,9 @@ sub create_promise_capability_record ($$) {
 
 sub new_promise_capability ($) {
   my $class = $_[0];
-  my $promise = bless {}, $class; # CreateFromConstructor
+  my $promise = bless {
+    new_caller => _get_caller,
+  }, $class; # CreateFromConstructor
   return create_promise_capability_record $promise, $class;
 } # new_promise_capability
 
@@ -152,7 +159,7 @@ sub initialize_promise ($$$) {
 
 sub new ($$) {
   my ($class, $executor) = @_;
-  my $promise = bless {}, $class;
+  my $promise = bless {new_caller => _get_caller}, $class;
   $promise->_new ($executor);
   return $promise;
 } # new
@@ -287,6 +294,7 @@ sub then ($$$) {
     enqueue_promise_reaction_job
         $reject_reaction, $promise->{promise_result}, ref $promise;
   }
+  $promise->{catch_registered} = 1;
   return $promise_capability->{promise};
 } # then
 
@@ -300,11 +308,28 @@ sub from_cv ($$) {
   });
 } # from_cv
 
+sub debug_info ($) {
+  my $self = $_[0];
+  no warnings 'uninitialized';
+  return sprintf '{%s: %s, created at %s line %s}',
+      ref $self,
+      $self->{promise_state},
+      $self->{new_caller}->{file},
+      $self->{new_caller}->{line};
+} # debug_info
+
 sub DESTROY ($) {
+  if (not $_[0]->{catch_registered} and
+      defined $_[0]->{promise_state} and
+      $_[0]->{promise_state} eq 'rejected') {
+    my $msg = "Uncaught rejection: @{[defined $_[0]->{promise_result} ? $_[0]->{promise_result} : '(undef)']}";
+    $msg .= " for " . $_[0]->debug_info . "\n" unless $msg =~ /\n$/;
+    warn $msg;
+  }
   local $@;
   eval { die };
   if ($@ =~ /during global destruction/) {
-    warn "Possible memory leak detected";
+    warn "Reference to " . $_[0]->debug_info . " is not discarded before global destruction\n";
   }
 } # DESTROY
 
