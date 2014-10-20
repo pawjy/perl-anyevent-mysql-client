@@ -222,7 +222,7 @@ sub connect ($%) {
       }
       $packet->_skip (10);
       if ($packet->{capability_flags} & CLIENT_SECURE_CONNECTION) {
-        my $length = $packet->{auth_plugin_data_len} - 8;
+        my $length = ($packet->{auth_plugin_data_len} || 0) - 8;
         $length = 13 if $length < 13;
         $packet->_string ($length => 'auth_plugin_data_2');
         $packet->{auth_plugin_data} .= delete $packet->{auth_plugin_data_2};
@@ -236,8 +236,7 @@ sub connect ($%) {
 
     $self->{capabilities} = CLIENT_LONG_PASSWORD | CLIENT_FOUND_ROWS |
         CLIENT_LONG_FLAG | CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 |
-        CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION |
-        CLIENT_MULTI_STATEMENTS | CLIENT_MULTI_RESULTS;
+        CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION;
     $charset = $packet->{character_set} if not defined $charset;
     $self->{character_set} = $charset;
 
