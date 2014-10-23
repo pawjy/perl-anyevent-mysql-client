@@ -24,4 +24,5 @@ Carp~1.3301
 File::Temp~0.2304
 DBD::mysql~4.028
 Path::Class~0.35
+File::Copy::Recursive~0.38
 Test::mysqld~0.17
