@@ -4,7 +4,7 @@ Test::Simple~1.001008
 Test::NoWarnings~1.04
 Test::Builder~1.001008
 AnyEvent::Util
-Digest::SHA~5.92
+Digest::SHA~5.93
 DBIx::RewriteDSN~0.05
 MRO::Compat~0.12
 Test::Deep~0.113
