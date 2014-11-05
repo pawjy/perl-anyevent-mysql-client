@@ -9,7 +9,7 @@ DBIx::RewriteDSN~0.05
 MRO::Compat~0.12
 Test::Deep~0.113
 File::Slurp~9999.19
-Path::Tiny~0.059
+Path::Tiny~0.060
 DBI~1.631
 Test::SharedFork~0.29
 Getopt::Long~2.42
