@@ -10,7 +10,7 @@ MRO::Compat~0.12
 Test::Deep~0.113
 File::Slurp~9999.19
 Path::Tiny~0.060
-DBI~1.631
+DBI~1.632
 Test::SharedFork~0.29
 Getopt::Long~2.42
 parent~0.228
