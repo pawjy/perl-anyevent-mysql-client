@@ -1,8 +1,8 @@
 Scalar::Util~1.41
 File::Spec~3.47
-Test::Simple~1.001011
+Test::Simple~1.001012
 Module::Runtime~0.014
-Test::Builder~1.001011
+Test::Builder~1.001012
 AnyEvent::Util
 Digest::SHA~5.93
 MRO::Compat~0.12
