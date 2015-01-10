@@ -7,7 +7,7 @@ AnyEvent::Util
 Digest::SHA~5.93
 MRO::Compat~0.12
 DBIx::RewriteDSN~0.05
-Test::Deep~0.114
+Test::Deep~0.115
 File::Slurp~9999.19
 Path::Tiny~0.061
 DBI~1.632
