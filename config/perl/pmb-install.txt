@@ -4,7 +4,7 @@ Test::Simple~1.001014
 Module::Runtime~0.014
 Test::Builder~1.001014
 AnyEvent::Util
-Digest::SHA~5.93
+Digest::SHA~5.95
 MRO::Compat~0.12
 DBIx::RewriteDSN~0.05
 Test::Deep~0.115
