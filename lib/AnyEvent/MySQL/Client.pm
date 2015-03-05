@@ -528,9 +528,9 @@ sub query ($$;$) {
 
   if (utf8::is_utf8 ($query)) {
     return $self->{command_promise} = $self->{command_promise}->then (sub {
-      return bless {is_failure => 1,
-                    message => "Query |$query| is utf8-flagged"},
-                        __PACKAGE__ . '::Result';
+      die bless {is_exception => 1,
+                 message => "Query |$query| is utf8-flagged"},
+                     __PACKAGE__ . '::Result';
     });
   }
 
@@ -641,9 +641,9 @@ sub statement_prepare ($$) {
 
   if (utf8::is_utf8 ($query)) {
     return $self->{command_promise} = $self->{command_promise}->then (sub {
-      return bless {is_failure => 1,
-                    message => "Query |$query| is utf8-flagged"},
-                        __PACKAGE__ . '::Result';
+      die bless {is_exception => 1,
+                 message => "Query |$query| is utf8-flagged"},
+                     __PACKAGE__ . '::Result';
     });
   }
 
