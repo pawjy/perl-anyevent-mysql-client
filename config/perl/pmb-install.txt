@@ -20,7 +20,7 @@ Test::Class~0.48
 Exporter::Lite~0.06
 Time::HiRes~1.9726
 Class::Accessor::Lite~0.06
-Carp~1.3301
+Carp~1.35
 File::Temp~0.2304
 DBD::mysql~4.031
 Path::Class~0.35
