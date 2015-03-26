@@ -360,8 +360,8 @@ sub _terminate_connection ($) {
   my ($self) = @_;
   if (defined $self->{handle}) {
     $self->{handle}->wtimeout (0.1);
-    $self->{handle}->push_shutdown;
-    $self->{handle}->start_read;
+    $self->{handle}->push_shutdown if defined $self->{handle};
+    $self->{handle}->start_read if defined $self->{handle};
   }
 } # _terminate_connection
 
