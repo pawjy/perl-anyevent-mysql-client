@@ -230,12 +230,12 @@ test {
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     return $client->query ("\x{500}");
-  })->then (sub {
+  })->catch (sub {
     my $result = $_[0];
     test {
       ok $result;
       isa_ok $result, 'AnyEvent::MySQL::Client::Result';
-      ok $result->is_failure;
+      ok $result->is_exception;
       is $result->packet, undef;
       like $result->message, qr{utf8};
     } $c;
