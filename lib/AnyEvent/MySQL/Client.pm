@@ -527,11 +527,10 @@ sub query ($$;$) {
           unless defined $self->{connect_promise};
 
   if (utf8::is_utf8 ($query)) {
-    return $self->{command_promise} = $self->{command_promise}->then (sub {
-      die bless {is_exception => 1,
-                 message => "Query |$query| is utf8-flagged"},
-                     __PACKAGE__ . '::Result';
-    });
+    return AnyEvent::MySQL::Client::Promise->reject
+        (bless {is_exception => 1,
+                message => "Query |$query| is utf8-flagged"},
+                   __PACKAGE__ . '::Result');
   }
 
   my $action_state = $OnActionInit->(query => defined $query ? $query : '',
