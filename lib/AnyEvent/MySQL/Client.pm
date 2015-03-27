@@ -137,7 +137,7 @@ sub connect ($%) {
        on_connect_error => sub {
          my ($hdl, $msg) = @_;
          $hdl->destroy;
-         if (defined $self->{on_eof}) {
+         if (defined $self->{on_eof}) { # awaiting for packets
            $self->{on_eof}->(bless {is_exception => 1,
                                     code => 0+$!,
                                     message => $msg}, __PACKAGE__ . '::Result');
@@ -155,15 +155,19 @@ sub connect ($%) {
        on_error => sub {
          my ($hdl, $fatal, $msg) = @_;
          $hdl->destroy;
-         if (defined $self->{on_eof}) {
+         if (defined $self->{on_eof}) { # awaiting for packets
            $self->{on_eof}->(bless {is_exception => 1,
                                     code => 0+$!,
                                     message => $msg}, __PACKAGE__ . '::Result');
            $ok_close->(bless {is_success => 1}, __PACKAGE__ . '::Result');
          } else {
-           $ng_close->(bless {is_exception => 1,
-                              code => 0+$!,
-                              message => $msg}, __PACKAGE__ . '::Result');
+           if ($! == 110) { # ETIMEDOUT
+             $ok_close->(bless {is_success => 1}, __PACKAGE__ . '::Result');
+           } else {
+             $ng_close->(bless {is_exception => 1,
+                                code => 0+$!,
+                                message => $msg}, __PACKAGE__ . '::Result');
+           }
          }
          delete $self->{handle};
          delete $self->{connect_promise};
