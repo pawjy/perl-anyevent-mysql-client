@@ -364,8 +364,8 @@ sub _terminate_connection ($) {
   my ($self) = @_;
   if (defined $self->{handle}) {
     $self->{handle}->wtimeout (0.1);
-    $self->{handle}->push_shutdown;
-    $self->{handle}->start_read;
+    $self->{handle}->push_shutdown if defined $self->{handle};
+    $self->{handle}->start_read if defined $self->{handle};
   }
 } # _terminate_connection
 
@@ -531,11 +531,10 @@ sub query ($$;$) {
           unless defined $self->{connect_promise};
 
   if (utf8::is_utf8 ($query)) {
-    return $self->{command_promise} = $self->{command_promise}->then (sub {
-      die bless {is_exception => 1,
-                 message => "Query |$query| is utf8-flagged"},
-                     __PACKAGE__ . '::Result';
-    });
+    return AnyEvent::MySQL::Client::Promise->reject
+        (bless {is_exception => 1,
+                message => "Query |$query| is utf8-flagged"},
+                   __PACKAGE__ . '::Result');
   }
 
   my $action_state = $OnActionInit->(query => defined $query ? $query : '',
