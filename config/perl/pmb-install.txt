@@ -1,7 +1,7 @@
 AnyEvent::Util
 Test::Builder~1.001014
 Digest::SHA~5.95
-CPAN::Meta~2.150001
+CPAN::Meta~2.150005
 Module::Build~0.4212
 Test::Deep~0.115
 Test::SharedFork~0.33
@@ -29,7 +29,7 @@ DBIx::RewriteDSN~0.05
 ExtUtils::CBuilder~0.280223
 File::Slurp~9999.19
 Path::Tiny~0.068
-Parse::CPAN::Meta~1.4414
+Parse::CPAN::Meta~1.4417
 version~0.9912
 CPAN::Meta::YAML~0.016
 Time::HiRes~1.9726
