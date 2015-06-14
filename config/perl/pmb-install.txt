@@ -2,7 +2,7 @@ AnyEvent::Util
 Test::Builder~1.001014
 Digest::SHA~5.95
 CPAN::Meta~2.150005
-Module::Build~0.4212
+Module::Build~0.4214
 Test::Deep~0.115
 Test::SharedFork~0.33
 DBI~1.633
