@@ -350,7 +350,7 @@ sub connect ($%) {
   })->catch (sub {
     my $error = $_[0];
     $self->_terminate_connection;
-    $ng_command->();
+    $ng_command->($error);
     $OnActionEnd->(state => $action_state, result => $error);
     if (defined $self->{close_promise}) {
       return $self->{close_promise}->then (sub { die $error });
