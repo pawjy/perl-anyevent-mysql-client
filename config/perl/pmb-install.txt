@@ -26,7 +26,7 @@ Module::Runtime~0.014
 Perl::OSType~1.009
 MRO::Compat~0.12
 DBIx::RewriteDSN~0.05
-ExtUtils::CBuilder~0.280223
+ExtUtils::CBuilder~0.280224
 File::Slurp~9999.19
 Path::Tiny~0.072
 Parse::CPAN::Meta~1.4417
