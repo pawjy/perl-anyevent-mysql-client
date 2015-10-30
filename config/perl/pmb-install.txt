@@ -15,7 +15,7 @@ Test::Class~0.50
 ExtUtils::ParseXS~3.30
 CPAN::Meta::Requirements~2.133
 File::Temp~0.2304
-DBD::mysql~4.032
+DBD::mysql~4.033
 Path::Class~0.35
 File::Copy::Recursive~0.38
 Test::mysqld~0.17
