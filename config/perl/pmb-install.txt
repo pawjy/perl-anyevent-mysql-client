@@ -34,5 +34,5 @@ version~0.9912
 CPAN::Meta::YAML~0.016
 Time::HiRes~1.9726
 Class::Accessor::Lite~0.08
-Carp~1.36
+Carp~1.38
 JSON::PP~2.27300
