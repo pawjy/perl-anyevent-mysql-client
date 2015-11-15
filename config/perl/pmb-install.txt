@@ -21,7 +21,7 @@ File::Copy::Recursive~0.38
 Test::mysqld~0.17
 Module::Metadata~1.000027
 Scalar::Util~1.42
-File::Spec~3.47
+File::Spec~3.59
 Module::Runtime~0.014
 Perl::OSType~1.009
 MRO::Compat~0.12
@@ -32,7 +32,7 @@ Path::Tiny~0.072
 Parse::CPAN::Meta~1.4417
 version~0.9912
 CPAN::Meta::YAML~0.016
-Time::HiRes~1.9726
+Time::HiRes~1.9728
 Class::Accessor::Lite~0.08
 Carp~1.38
 JSON::PP~2.27300
