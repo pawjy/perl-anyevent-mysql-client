@@ -4,7 +4,7 @@ Digest::SHA~5.95
 CPAN::Meta~2.150005
 Module::Build~0.4214
 Test::Deep~1.120
-Test::SharedFork~0.34
+Test::SharedFork~0.35
 DBI~1.634
 Getopt::Long~2.48
 Try::Tiny~0.24
