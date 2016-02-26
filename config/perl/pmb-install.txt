@@ -16,7 +16,7 @@ ExtUtils::ParseXS~3.30
 CPAN::Meta::Requirements~2.140
 File::Temp~0.2304
 DBD::mysql~4.033
-Path::Class~0.35
+Path::Class~0.36
 File::Copy::Recursive~0.38
 Test::mysqld~0.17
 Module::Metadata~1.000027
@@ -30,7 +30,7 @@ ExtUtils::CBuilder~0.280224
 File::Slurp~9999.19
 Path::Tiny~0.076
 Parse::CPAN::Meta~1.4417
-version~0.9912
+version~0.9914
 CPAN::Meta::YAML~0.018
 Time::HiRes~1.9728
 TAP::Harness~3.36
