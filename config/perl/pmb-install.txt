@@ -31,7 +31,7 @@ Path::Tiny~0.084
 Parse::CPAN::Meta~1.4417
 version~0.9915
 CPAN::Meta::YAML~0.018
-Time::HiRes~1.9728
+Time::HiRes~1.9732
 TAP::Harness~3.36
 Class::Accessor::Lite~0.08
 Carp~1.38
