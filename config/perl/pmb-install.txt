@@ -20,7 +20,7 @@ Path::Class~0.36
 File::Copy::Recursive~0.38
 Test::mysqld~0.17
 Module::Metadata~1.000027
-Scalar::Util~1.43
+Scalar::Util~1.44
 Module::Runtime~0.014
 Perl::OSType~1.009
 MRO::Compat~0.12
