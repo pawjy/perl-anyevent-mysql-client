@@ -1,5 +1,5 @@
 AnyEvent::Util
-Test::Builder~1.302030
+Test::Builder~1.302031
 Digest::SHA~5.95
 CPAN::Meta~2.150005
 Module::Build~0.4218
@@ -22,7 +22,7 @@ Test::mysqld~0.17
 Module::Metadata~1.000027
 Scalar::Util~1.45
 Module::Runtime~0.014
-Perl::OSType~1.009
+Perl::OSType~1.010
 MRO::Compat~0.12
 DBIx::RewriteDSN~0.05
 ExtUtils::CBuilder~0.280224
