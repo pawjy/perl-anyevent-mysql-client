@@ -28,10 +28,10 @@ DBIx::RewriteDSN~0.05
 ExtUtils::CBuilder~0.280224
 File::Slurp~9999.19
 Path::Tiny~0.094
-Parse::CPAN::Meta~1.4417
+Parse::CPAN::Meta~1.4421
 version~0.9917
 CPAN::Meta::YAML~0.018
-Time::HiRes~1.9738
+Time::HiRes~1.9739
 TAP::Harness~3.36
 Class::Accessor::Lite~0.08
 Carp~1.38
