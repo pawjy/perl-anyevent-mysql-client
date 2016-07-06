@@ -3,7 +3,6 @@ Test::Builder~1.302037
 Digest::SHA~5.95
 CPAN::Meta~2.150005
 Module::Build~0.4218
-Test::Deep~1.120
 Test::SharedFork~0.35
 DBI~1.636
 Getopt::Long~2.49
@@ -15,7 +14,7 @@ Test::Class~0.50
 ExtUtils::ParseXS~3.30
 CPAN::Meta::Requirements~2.140
 File::Temp~0.2304
-DBD::mysql~4.033
+DBD::mysql~4.034
 Path::Class~0.36
 File::Copy::Recursive~0.38
 Test::mysqld~0.17
@@ -30,8 +29,8 @@ File::Slurp~9999.19
 Path::Tiny~0.096
 Parse::CPAN::Meta~1.4422
 version~0.9917
-CPAN::Meta::YAML~0.018
 Time::HiRes~1.9739
+CPAN::Meta::YAML~0.018
 TAP::Harness~3.36
 Class::Accessor::Lite~0.08
 Carp~1.38
