@@ -840,7 +840,11 @@ sub statement_execute ($$;$$) {
   }, sub {
     $self->_terminate_connection;
     $OnActionEnd->(state => $action_state, result => $_[0]);
-    die $_[0];
+    if ($_[0] eq 'Broken pipe') {
+      die "Connection closed by server";
+    } else {
+      die $_[0];
+    }
   });
 } # statement_execute
 
