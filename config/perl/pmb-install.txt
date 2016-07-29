@@ -1,6 +1,6 @@
 AnyEvent::Util
-Test::Builder~1.302047
-Digest::SHA~5.95
+Test::Builder~1.302049
+Digest::SHA~5.96
 CPAN::Meta~2.150005
 Module::Build~0.4218
 Test::SharedFork~0.35
