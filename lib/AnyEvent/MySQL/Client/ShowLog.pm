@@ -125,7 +125,7 @@ sub show_result ($$) {
         if $WARN;
   } elsif ($self->{action_type} eq 'connect') {
     if ($WARN) {
-      my $dsn = sprintf 'DBI:mysql:host=%s;port=%s;%susername=%s;password=%s;dbname=%s',
+      my $dsn = sprintf 'DBI:mysql:host=%s;port=%s;%suser=%s;password=%s;dbname=%s',
           $self->{hostname} // '',
           $self->{port} // '',
           $self->{tls} ? 'mysql_ssl=1;' : '',
