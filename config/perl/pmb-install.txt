@@ -5,7 +5,7 @@ CPAN::Meta::YAML~0.018
 Carp~1.38
 Class::Accessor::Lite~0.08
 Cwd~3.62
-DBD::mysql~4.035
+DBD::mysql~4.036
 DBI~1.636
 DBIx::RewriteDSN~0.05
 Digest::SHA~5.96
