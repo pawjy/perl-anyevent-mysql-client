@@ -27,11 +27,11 @@ Perl::OSType~1.010
 Scalar::Util~1.45
 TAP::Harness~3.36
 Term::ANSIColor~4.05
-Test::Builder~1.302056
+Test::Builder~1.302059
 Test::Class~0.50
 Test::SharedFork~0.35
 Test::mysqld~0.17
-Time::HiRes~1.9739
+Time::HiRes~1.9740
 Try::Tiny~0.27
 parent~0.234
 version~0.9917
