@@ -24,7 +24,7 @@ Module::Runtime~0.014
 Path::Class~0.37
 Path::Tiny~0.096
 Perl::OSType~1.010
-Scalar::Util~1.45
+Scalar::Util~1.46
 TAP::Harness~3.36
 Term::ANSIColor~4.05
 Test::Builder~1.302059
