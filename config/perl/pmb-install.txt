@@ -1,4 +1,4 @@
-AnyEvent::Handle
+AnyEvent::Util
 Carp~1.38
 Class::Accessor::Lite~0.08
 Cwd~3.62
@@ -16,7 +16,7 @@ Module::Runtime~0.014
 Path::Class~0.37
 Path::Tiny~0.098
 Scalar::Util~1.46
-Term::ANSIColor~4.05
+Term::ANSIColor~4.06
 Test::Builder~1.302062
 Test::Class~0.50
 Test::SharedFork~0.35
