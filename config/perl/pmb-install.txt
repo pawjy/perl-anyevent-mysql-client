@@ -1,4 +1,4 @@
-AnyEvent::Handle
+AnyEvent::Util
 Carp~1.38
 Class::Accessor::Lite~0.08
 Cwd~3.62
