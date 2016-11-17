@@ -1,8 +1,8 @@
-AnyEvent~7.13
+AnyEvent::Handle
 Carp~1.38
 Class::Accessor::Lite~0.08
 Cwd~3.62
-DBD::mysql~4.038
+DBD::mysql~4.039
 DBI~1.636
 DBIx::RewriteDSN~0.05
 Digest::SHA~5.96
