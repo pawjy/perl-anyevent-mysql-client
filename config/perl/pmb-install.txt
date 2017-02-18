@@ -14,7 +14,7 @@ Getopt::Long~2.49
 MRO::Compat~0.12
 Module::Runtime~0.014
 Path::Class~0.37
-Path::Tiny~0.100
+Path::Tiny~0.104
 Scalar::Util~1.47
 Term::ANSIColor~4.06
 Test::Builder~1.302075
