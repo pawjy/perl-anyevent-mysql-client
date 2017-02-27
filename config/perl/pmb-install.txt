@@ -1,4 +1,4 @@
-AnyEvent~7.13
+AnyEvent::Util
 Carp~1.38
 Class::Accessor::Lite~0.08
 Cwd~3.62
@@ -17,8 +17,8 @@ Path::Class~0.37
 Path::Tiny~0.104
 Scalar::Util~1.47
 Term::ANSIColor~4.06
+Test::Builder~1.302075
 Test::Class~0.50
-Test::More~1.302075
 Test::SharedFork~0.35
 Test::mysqld~0.20
 Time::HiRes~1.9741
