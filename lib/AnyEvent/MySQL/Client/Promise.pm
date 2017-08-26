@@ -2,14 +2,12 @@ package AnyEvent::MySQL::Client::Promise;
 use strict;
 use warnings;
 use warnings FATAL => 'uninitialized';
-our $VERSION = '4.0';
+our $VERSION = '5.0';
 use Carp;
 push our @CARP_NOT, qw(Promise::TypeError);
 
-sub _get_caller () {
-  return scalar Carp::caller_info
-      (Carp::short_error_loc() || Carp::long_error_loc());
-} # _get_caller
+## Not public; using |our| such that |local| can be used.
+our $CallerLevel = 0;
 
 $Promise::CreateTypeError ||= sub ($$) {
   require Promise::TypeError;
@@ -38,7 +36,13 @@ sub _enqueue_promise_reaction_job ($$) {
     ## PromiseReactionJob
     my $promise_capability = $reaction->{capability};
     if (defined $reaction->{handler}) {
-      my $handler_result = eval { $reaction->{handler}->($argument) };
+      my $file = $reaction->{caller}->[1];
+      $file =~ s/[\x0D\x0A\x22]/_/g;
+      my $handler_result = eval sprintf q{
+package AnyEvent::MySQL::Client::Promise::_Dummy;
+#line %d "%s"
+$reaction->{handler}->($argument);
+}, $reaction->{caller}->[2], $file;
       return $promise_capability->{reject}->($@) if $@;
       return $promise_capability->{resolve}->($handler_result);
     } else {
@@ -131,6 +135,7 @@ sub _new_promise_capability ($) {
     return undef;
   };
 
+  local $CallerLevel = $CallerLevel + 2;
   $promise_capability->{promise} = $class->new ($executor); # or throw
   die _type_error
       ('The executor is not invoked or the resolver is not specified')
@@ -147,7 +152,7 @@ sub new ($$) {
   my ($class, $executor) = @_;
   die _type_error ('The executor is not a code reference')
       unless defined $executor and ref $executor eq 'CODE';
-  my $promise = bless {new_caller => _get_caller}, $class;
+  my $promise = bless {caller => [caller $CallerLevel]}, $class;
   $promise->{promise_state} = 'pending';
   $promise->{promise_fulfill_reactions} = [];
   $promise->{promise_reject_reactions} = [];
@@ -245,12 +250,15 @@ sub resolve ($$) {
 } # resolve
 
 sub catch ($$) {
+  local $CallerLevel = 1;
   return $_[0]->then (undef, $_[1]); # or throw
 } # catch
 
 sub then ($$$) {
   my ($promise, $onfulfilled, $onrejected) = @_;
   my $promise_capability = _new_promise_capability ref $promise; # or throw
+
+  my $caller = [caller ((sub { Carp::short_error_loc })->() - 1)];
 
   ## PerformPromiseThen
   $onfulfilled = undef
@@ -259,10 +267,12 @@ sub then ($$$) {
       if not defined $onrejected or not ref $onrejected eq 'CODE';
   my $fulfill_reaction = {type => 'fulfill',
                           capability => $promise_capability,
-                          handler => $onfulfilled};
+                          handler => $onfulfilled,
+                          caller => $caller};
   my $reject_reaction = {type => 'reject',
                          capability => $promise_capability,
-                         handler => $onrejected};
+                         handler => $onrejected,
+                         caller => $caller};
   if ($promise->{promise_state} eq 'pending') {
     push @{$promise->{promise_fulfill_reactions}}, $fulfill_reaction
         if defined $promise->{promise_fulfill_reactions} and
@@ -287,6 +297,7 @@ sub manakai_set_handled ($) {
 
 sub from_cv ($$) {
   my ($class, $cv) = @_;
+  local $CallerLevel = 1;
   return $class->new (sub {
     my ($resolve, $reject) = @_;
     $cv->cb (sub {
@@ -315,8 +326,8 @@ sub debug_info ($) {
   return sprintf '{%s: %s, created at %s line %s}',
       ref $self,
       $self->{promise_state},
-      $self->{new_caller}->{file},
-      $self->{new_caller}->{line};
+      $self->{caller}->[1],
+      $self->{caller}->[2];
 } # debug_info
 
 sub DESTROY ($) {
