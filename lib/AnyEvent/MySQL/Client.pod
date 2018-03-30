@@ -181,6 +181,26 @@ never been invoked.  Note that additional information on query such as
 affected row count might be available in the C<packet> of a success
 result object.
 
+SQL C<begin>, C<commit>, and C<rollback> statements can be sent to the
+server by this method.  Please be aware that any statement between
+C<begin> statement and subsequent C<commit> or C<rollback> command are
+considered as part of the transaction.  For example, in a bad code
+fragment:
+
+  ## BAD EXAMPLE
+  Promise->all ([
+    Promise->resolve->then (sub { $client->query ('INSERT ...') }, ## #1
+    $client->query ('BEGIN')->then (sub {
+      return $client->query ('INSERT ...'); ## #2
+    })->then (sub {
+      return $client->query ('COMMIT');
+    }),
+    $client->query ('INSERT ...'), ## #3
+  ])
+
+... the C<insert> statements #1 and #3 might be considered as part of
+the transaction, depending on unforeseeable factors.
+
 =item $promise = $client->statement_prepare ($query)
 
 Send a C<COM_STMT_PREPARE> command with the specified query (an SQL
