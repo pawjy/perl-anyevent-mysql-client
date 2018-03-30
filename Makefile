@@ -31,9 +31,9 @@ pmbp-update: git-submodules pmbp-upgrade
 pmbp-install: pmbp-upgrade
 	perl local/bin/pmbp.pl $(PMBP_OPTIONS) --install
 
-lib/AnyEvent/MySQL/Client/Promise.pm:
+lib/AnyEvent/MySQL/Client/Promise.pm: modules/promise/lib/Promise.pm
 	mkdir -p lib/AnyEvent/MySQL/Client
-	$(CURL) -s -S -L https://raw.githubusercontent.com/wakaba/perl-promise/master/lib/Promise.pm | \
+	cat $< | \
 	perl -n -e 's/package Promise/package AnyEvent::MySQL::Client::Promise/g; print' > $@
 	perl -c $@
 

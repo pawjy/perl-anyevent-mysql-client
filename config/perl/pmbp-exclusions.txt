@@ -1,2 +1,4 @@
 - "../../t_deps/modules/test-x1" tests
 - "../../t_deps/modules/rdb-utils" tests anyeventdbi
+
+- "../../modules/promise" build tests
