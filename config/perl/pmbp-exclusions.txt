@@ -2,3 +2,9 @@
 - "../../t_deps/modules/rdb-utils" tests anyeventdbi
 
 - "../../modules/promise" build tests
+- "../../t_deps/modules/promised-mysqld" build tests
+- "../../t_deps/modules/promised-command" build tests
+- "../../t_deps/modules/streams" build tests
+- "../../t_deps/modules/promised-file" build tests
+- "../../t_deps/modules/anyevent-mysql-client" build tests
+- "../../t_deps/modules/web-encodings" build tests

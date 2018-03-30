@@ -1,16 +1,10 @@
 use strict;
 use warnings;
 use Path::Tiny;
-use lib glob path (__FILE__)->parent->parent->child ('lib');
-use lib glob path (__FILE__)->parent->parent->child ('t_deps/modules/*/lib');
-use Test::MySQL::CreateDatabase qw(test_dsn);
-use AnyEvent::MySQL::Client;
-use Test::More;
-use Test::X1;
+use lib glob path (__FILE__)->parent->parent->child ('t_deps/lib');
+use Tests;
 
-my $dsn = test_dsn 'hoge';
-$dsn =~ s/^DBI:mysql://i;
-my %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
+my %dsn;
 
 test {
   my $c = shift;
@@ -98,11 +92,15 @@ test {
   });
 } n => 1, name => 'die while sending and then disconnect';
 
-run_tests;
+RUN sub {
+  my $dsn = test_dsn 'hoge';
+  $dsn =~ s/^DBI:mysql://i;
+  %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
+};
 
 =head1 LICENSE
 
-Copyright 2014 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2018 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

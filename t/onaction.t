@@ -2,15 +2,10 @@ use strict;
 use warnings;
 no warnings 'once';
 use Path::Tiny;
-use lib glob path (__FILE__)->parent->parent->child ('lib');
-use lib glob path (__FILE__)->parent->parent->child ('t_deps/modules/*/lib');
-use Test::MySQL::CreateDatabase qw(test_dsn);
-use Test::More;
-use Test::X1;
+use lib glob path (__FILE__)->parent->parent->child ('t_deps/lib');
+use Tests;
 
-my $dsn = test_dsn 'hoge';
-$dsn =~ s/^DBI:mysql://i;
-my %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
+my %dsn;
 
 my @ActionLog;
 my $i = 0;
@@ -112,13 +107,18 @@ test {
   });
 } n => 34;
 
-run_tests;
+RUN sub {
+  my $dsn = test_dsn 'hoge';
+  $dsn =~ s/^DBI:mysql://i;
+  %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
+  @ActionLog = ();
+};
 
 @ActionLog = ();
 
 =head1 LICENSE
 
-Copyright 2014 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2018 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

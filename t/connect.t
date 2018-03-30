@@ -1,26 +1,14 @@
 use strict;
 use warnings;
 use Path::Tiny;
-use lib glob path (__FILE__)->parent->parent->child ('lib');
-use lib glob path (__FILE__)->parent->parent->child ('t_deps/modules/*/lib');
-use Test::MySQL::CreateDatabase qw(test_dsn);
-use AnyEvent::MySQL::Client;
-use Test::More;
-use Test::X1;
+use lib glob path (__FILE__)->parent->parent->child ('t_deps/lib');
+use Tests;
 
-my $dsn = test_dsn 'hoge';
-$dsn =~ s/^DBI:mysql://i;
-my %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
-
+my %dsn;
 my $USER1 = 'foo';
 my $PASS1 = 'bar';
-Test::MySQL::CreateDatabase::test_dbh_do
-    ('grant all privileges on *.* to "'.$USER1.'"@"localhost" identified by "'.$PASS1.'"');
-
 my $USER2 = "\xFE\x80\x03a";
 my $PASS2 = "\x66\x90\xAC\xFF";
-Test::MySQL::CreateDatabase::test_dbh_do
-    ("grant all privileges on *.* to '".$USER2."'\@'localhost' identified by '".$PASS2."'");
 
 test {
   my $c = shift;
@@ -714,11 +702,38 @@ test {
   });
 } n => 2, name => 'connect then disconnect soon';
 
-run_tests;
+RUN sub {
+  my $dsn = test_dsn 'hoge';
+  $dsn =~ s/^DBI:mysql://i;
+  %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
+
+  my $client = AnyEvent::MySQL::Client->new;
+  my %connect;
+  if (defined $dsn{port}) {
+    $connect{hostname} = $dsn{host};
+    $connect{port} = $dsn{port};
+  } else {
+    $connect{hostname} = 'unix/';
+    $connect{port} = $dsn{mysql_socket};
+  }
+  $client->connect (
+    %connect,
+    username => $dsn{user},
+    password => $dsn{password},
+    database => 'mysql',
+    character_set => 'default',
+  )->then (sub {
+    return $client->query ('grant all privileges on *.* to "'.$USER1.'"@"localhost" identified by "'.$PASS1.'"');
+  })->then (sub {
+    return $client->query ("grant all privileges on *.* to '".$USER2."'\@'localhost' identified by '".$PASS2."'");
+  })->then (sub {
+    return $client->disconnect;
+  })->to_cv->recv;
+};
 
 =head1 LICENSE
 
-Copyright 2014 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2018 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

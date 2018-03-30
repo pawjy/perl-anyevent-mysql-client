@@ -6,3 +6,6 @@ Scalar::Util
 ## Promise
 Carp
 AnyEvent
+
+## AnyEvent::Handle
+Net::SSLeay
