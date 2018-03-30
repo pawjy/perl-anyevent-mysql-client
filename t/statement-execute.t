@@ -590,7 +590,7 @@ for my $test (
   {id => 19, type => 'tinyint unsigned', w => '250', r => {type => 'TINY', value => 250, unsigned => 1}},
   {id => 20, type => 'int unsigned', w => 2**31, r => {type => 'LONG', value => 2**31, unsigned => 1}},
   {id => 21, type => 'datetime', w => '"0021-04-01 12:22:31"', r => {type => 'DATETIME', value => '0021-04-01 12:22:31'}},
-  {id => 22, type => 'timestamp', w => '"2010-04-01 12:22:31"', r => {type => 'TIMESTAMP', value => '2010-04-01 12:22:31', unsigned => 1}},
+  {id => 22, type => 'timestamp', w => '"2010-04-01 12:22:31"', r => {type => 'TIMESTAMP', value => '2010-04-01 12:22:31'}, optional_unsigned => 1},
   {id => 23, type => 'date', w => '"2010-04-01"', r => {type => 'DATE', value => '2010-04-01 00:00:00'}},
   {id => 24, type => 'datetime', w => '"0000-00-00 00:00:00"', r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}},
   {id => 25, type => 'time', w => '"00:00:00"', r => {type => 'TIME', value => '00:00:00'}},
@@ -621,7 +621,13 @@ for my $test (
     })->then (sub {
       my ($result, $rows) = @{$_[0]};
       test {
-        is_deeply [map { $_->packet->{data} } @$rows], [[$test->{r}]];
+        if ($test->{optional_unsigned} and
+            $rows->[0]->packet->{data}->[0]->{unsigned}) {
+          $test->{r}->{unsigned} = 1;
+          is_deeply [map { $_->packet->{data} } @$rows], [[$test->{r}]];
+        } else {
+          is_deeply [map { $_->packet->{data} } @$rows], [[$test->{r}]];
+        }
       } $c;
     })->then (sub {
       return $client->query ('show tables');
@@ -644,7 +650,7 @@ for my $test (
 
 for my $test (
   {id => 1, type => 'datetime', w => {type => 'DATETIME', value => "0021-04-01 12:22:31"}, r => {type => 'DATETIME', value => '0021-04-01 12:22:31'}},
-  {id => 2, type => 'timestamp', w => {type => 'TIMESTAMP', value => "2010-04-01 12:22:31"}, r => {type => 'TIMESTAMP', value => '2010-04-01 12:22:31', unsigned => 1}},
+  {id => 2, type => 'timestamp', w => {type => 'TIMESTAMP', value => "2010-04-01 12:22:31"}, r => {type => 'TIMESTAMP', value => '2010-04-01 12:22:31'}, optional_unsigned => 1},
   {id => 3, type => 'date', w => {type => 'DATE', value => "2010-04-01"}, r => {type => 'DATE', value => '2010-04-01 00:00:00'}},
   {id => 4, type => 'datetime', w => {type => 'DATETIME', value => "0000-00-00 00:00:00"}, r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}},
   {id => 5, type => 'datetime', w => {type => 'DATETIME', value => "8000-99-99 99:99:99"}, r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}},
@@ -684,7 +690,13 @@ for my $test (
     })->then (sub {
       my ($result, $rows) = @{$_[0]};
       test {
-        is_deeply [map { $_->packet->{data} } @$rows], [[$test->{r}]];
+        if ($test->{optional_unsigned} and
+            $rows->[0]->packet->{data}->[0]->{unsigned}) {
+          $test->{r}->{unsigned} = 1;
+          is_deeply [map { $_->packet->{data} } @$rows], [[$test->{r}]];
+        } else {
+          is_deeply [map { $_->packet->{data} } @$rows], [[$test->{r}]];
+        }
       } $c;
     })->then (sub {
       return $client->query ('show tables');
