@@ -1,6 +1,6 @@
 {
   "travisci": {
-    "pmbp": "5.10+",
+    "pmbp": "5.12+",
     "merger": 1
   },
   "circleci": {

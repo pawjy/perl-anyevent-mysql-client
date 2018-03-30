@@ -406,7 +406,7 @@ not use blocking I/O and they should return as soon as possible.
 
 =head1 DEPENDENCY
 
-The module requires Perl 5.10 or later and L<AnyEvent>.  It also
+The module requires Perl 5.12 or later and L<AnyEvent>.  It also
 requires some core modules.
 
 =head1 SPECIFICATION
@@ -434,7 +434,7 @@ Thanks to suzak and hatz48.
 
 =head1 LICENSE
 
-Copyright 2014 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2018 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
