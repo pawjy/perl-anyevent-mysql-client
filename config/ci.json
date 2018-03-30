@@ -1,0 +1,9 @@
+{
+  "travisci": {
+    "pmbp": "5.10+",
+    "merger": 1
+  },
+  "circleci": {
+    "gaa": 1
+  }
+}
