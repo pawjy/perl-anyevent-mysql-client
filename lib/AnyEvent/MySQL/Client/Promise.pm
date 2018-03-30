@@ -38,12 +38,14 @@ sub _enqueue_promise_reaction_job ($$) {
     if (defined $reaction->{handler}) {
       my $file = $reaction->{caller}->[1];
       $file =~ s/[\x0D\x0A\x22]/_/g;
-      my $handler_result = eval sprintf q{
+      my $handler_result;
+      my $eval_result = eval sprintf q{
 package AnyEvent::MySQL::Client::Promise::_Dummy;
 #line %d "%s"
-$reaction->{handler}->($argument);
+$handler_result = $reaction->{handler}->($argument);
+1;
 }, $reaction->{caller}->[2], $file;
-      return $promise_capability->{reject}->($@) if $@;
+      return $promise_capability->{reject}->($@) unless $eval_result;
       return $promise_capability->{resolve}->($handler_result);
     } else {
       if ($reaction->{type} eq 'fulfill') {
@@ -62,9 +64,13 @@ sub _enqueue_promise_resolve_thenable_job ($$$) {
   _enqueue {
     ## PromiseResolveThenableJob
     my $resolving_functions = _create_resolving_functions $promise_to_resolve;
-    my $then_call_result = eval { $then->($thenable, $resolving_functions->{resolve}, $resolving_functions->{reject}) };
-    return $resolving_functions->{reject}->($@) if $@;
-    return $then_call_result;
+    my $eval_result = eval {
+      # gives scalar context
+      my $then_call_result = $then->($thenable, $resolving_functions->{resolve}, $resolving_functions->{reject});
+      1;
+    };
+    return $resolving_functions->{reject}->($@) unless $eval_result;
+    #return $then_call_result; # unused
   };
 } # _enqueue_promise_resolve_thenable_job
 
@@ -105,8 +111,13 @@ sub _create_resolving_functions ($) {
         if defined $_[0] and $_[0] eq $promise; ## SameValue
     return _fulfill_promise $promise, $_[0]
         if not defined $_[0] or not ref $_[0];
-    my $then = eval { UNIVERSAL::can ($_[0], 'then') && $_[0]->can ('then') };
-    return _reject_promise $promise, $@ if $@;
+    local $@;
+    my $then;
+    my $eval_result = eval {
+      $then = UNIVERSAL::can ($_[0], 'then') && $_[0]->can ('then');
+      1;
+    };
+    return _reject_promise $promise, $@ unless $eval_result;
     return _fulfill_promise $promise, $_[0]
         unless defined $then and ref $then eq 'CODE';
     _enqueue_promise_resolve_thenable_job $promise, $_[0], $then;
@@ -160,8 +171,11 @@ sub new ($$) {
   my $resolving_functions = _create_resolving_functions $promise;
   {
     local $@;
-    eval { $executor->($resolving_functions->{resolve}, $resolving_functions->{reject}) };
-    $resolving_functions->{reject}->($@) if $@;
+    my $eval_result = eval {
+      $executor->($resolving_functions->{resolve}, $resolving_functions->{reject});
+      1;
+    };
+    $resolving_functions->{reject}->($@) unless $eval_result;
   }
   return $promise;
 } # new
@@ -169,8 +183,13 @@ sub new ($$) {
 sub all ($$) {
   my ($class, $iterable) = @_;
   my $promise_capability = _new_promise_capability $class; # or throw
-  my $iterator = [eval { @$iterable }];
-  if ($@) { ## IfAbruptRejectPromise
+  local $@;
+  my $iterator;
+  my $eval_result = eval {
+    $iterator = [@$iterable];
+    1;
+  };
+  unless ($eval_result) { ## IfAbruptRejectPromise
     $promise_capability->{reject}->($@);
     return $promise_capability->{promise};
   }
@@ -186,8 +205,12 @@ sub all ($$) {
       }
       return $promise_capability->{promise};
     }
-    my $next_promise = eval { $class->resolve ($iterator->[$index]) };
-    if ($@) { ## IfAbruptRejectPromise
+    my $next_promise;
+    my $eval_result = eval {
+      $next_promise = $class->resolve ($iterator->[$index]);
+      1;
+    };
+    unless ($eval_result) { ## IfAbruptRejectPromise
       $promise_capability->{reject}->($@);
       return $promise_capability->{promise};
     }
@@ -204,8 +227,11 @@ sub all ($$) {
       return undef;
     };
     $remaining_elements_count++;
-    eval { $next_promise->then ($resolve_element, $promise_capability->{reject}) };
-    if ($@) { ## IfAbruptRejectPromise
+    $eval_result = eval {
+      $next_promise->then ($resolve_element, $promise_capability->{reject});
+      1;
+    };
+    unless ($eval_result) { ## IfAbruptRejectPromise
       $promise_capability->{reject}->($@);
       return $promise_capability->{promise};
     }
@@ -217,18 +243,24 @@ sub all ($$) {
 sub race ($$) {
   my ($class, $iterable) = @_;
   my $promise_capability = _new_promise_capability $class; # or throw
-  my $iterator = [eval { @$iterable }];
-  if ($@) { ## IfAbruptRejectPromise
+  local $@;
+  my $iterator;
+  my $eval_result = eval {
+    $iterator = [@$iterable];
+    1;
+  };
+  unless ($eval_result) { ## IfAbruptRejectPromise
     $promise_capability->{reject}->($@);
     return $promise_capability->{promise};
   }
   ## PerformPromiseRace
   for my $value (@$iterator) {
-    eval {
+    my $eval_result = eval {
       my $promise = $class->resolve ($value);
-      $promise->then ($promise_capability->{resolve}, $promise_capability->{reject});
+      scalar $promise->then ($promise_capability->{resolve}, $promise_capability->{reject});
+      1;
     };
-    if ($@) { ## IfAbruptRejectPromise
+    unless ($eval_result) { ## IfAbruptRejectPromise
       $promise_capability->{reject}->($@);
       return $promise_capability->{promise};
     }
@@ -261,10 +293,20 @@ sub then ($$$) {
   my $caller = [caller ((sub { Carp::short_error_loc })->() - 1)];
 
   ## PerformPromiseThen
-  $onfulfilled = undef
-      if not defined $onfulfilled or not ref $onfulfilled eq 'CODE';
-  $onrejected = undef
-      if not defined $onrejected or not ref $onrejected eq 'CODE';
+  if (defined $onfulfilled and not ref $onfulfilled eq 'CODE') {
+    warn sprintf "Fulfilled callback is not a CODE (%s) at %s line %s\n",
+        $onfulfilled,
+        $caller->[1],
+        $caller->[2];
+    $onfulfilled = undef;
+  }
+  if (defined $onrejected and not ref $onrejected eq 'CODE') {
+    warn sprintf "Rejected callback is not a CODE (%s) at %s line %s\n",
+        $onrejected,
+        $caller->[1],
+        $caller->[2];
+    $onrejected = undef;
+  }
   my $fulfill_reaction = {type => 'fulfill',
                           capability => $promise_capability,
                           handler => $onfulfilled,
@@ -301,10 +343,11 @@ sub from_cv ($$) {
   return $class->new (sub {
     my ($resolve, $reject) = @_;
     $cv->cb (sub {
-      eval {
+      my $eval_result = eval {
         $resolve->($_[0]->recv);
+        1;
       };
-      $reject->($@) if $@;
+      $reject->($@) unless $eval_result;
     });
   });
 } # from_cv

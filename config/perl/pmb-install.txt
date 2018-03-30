@@ -1,4 +1,4 @@
-AnyEvent::Handle
+AnyEvent::Util
 Carp~1.38
 Class::Accessor::Lite~0.08
 Cwd~3.74
@@ -13,7 +13,6 @@ File::Slurp~9999.19
 File::Temp~0.2304
 Getopt::Long~2.5
 MRO::Compat~0.13
-Module::Build~0.4224
 Module::Runtime~0.016
 Net::SSLeay~1.85
 Path::Class~0.37
