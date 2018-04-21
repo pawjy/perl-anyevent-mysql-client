@@ -1,13 +1,13 @@
-AnyEvent~7.14
+AnyEvent::IO
 Carp~1.38
 Class::Accessor::Lite~0.08
 Cwd~3.74
 DBD::mysql~4.046
 DBI~1.641
 DBIx::RewriteDSN~0.05
-Digest::SHA~6.01
+Digest::SHA~6.02
 Exporter::Lite~0.08
-File::Copy::Recursive~0.41
+File::Copy::Recursive~0.43
 File::Path~2.15
 File::Slurp~9999.19
 File::Temp~0.2304
