@@ -8,7 +8,7 @@ updatenightly: local/bin/pmbp.pl \
     clean-lib/AnyEvent/MySQL/Client/Promise.pm \
     lib/AnyEvent/MySQL/Client/Promise.pm
 	$(CURL) -s -S -L https://gist.githubusercontent.com/wakaba/34a71d3137a52abb562d/raw/gistfile1.txt | sh
-	$(GIT) add t_deps/modules
+	$(GIT) add modules t_deps/modules
 	perl local/bin/pmbp.pl --update
 	$(GIT) add config lib
 	$(CURL) -sSLf https://raw.githubusercontent.com/wakaba/ciconfig/master/ciconfig | RUN_GIT=1 REMOVE_UNUSED=1 perl
