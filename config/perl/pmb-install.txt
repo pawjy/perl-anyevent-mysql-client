@@ -1,4 +1,4 @@
-AnyEvent::Handle
+AnyEvent::Util
 Carp~1.38
 Class::Accessor::Lite~0.08
 Cwd~3.74
@@ -10,7 +10,7 @@ Exporter::Lite~0.08
 File::Copy::Recursive~0.44
 File::Path~2.15
 File::Slurp~9999.19
-File::Temp~0.2304
+File::Temp~0.2306
 Getopt::Long~2.5
 MRO::Compat~0.13
 Module::Runtime~0.016
@@ -20,8 +20,8 @@ Path::Tiny~0.104
 Scalar::Util~1.50
 Socket~2.027
 Term::ANSIColor~4.06
-Test::Builder~1.302136
 Test::Class~0.50
+Test::More~1.302136
 Test::mysqld~1.0000
 Time::HiRes~1.9758
 Try::Tiny~0.30
