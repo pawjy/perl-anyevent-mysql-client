@@ -1,4 +1,4 @@
-AnyEvent::Util
+AnyEvent::Handle
 Carp~1.38
 Class::Accessor::Lite~0.08
 Cwd~3.74
@@ -16,7 +16,7 @@ MRO::Compat~0.13
 Module::Runtime~0.016
 Net::SSLeay~1.85
 Path::Class~0.37
-Path::Tiny~0.106
+Path::Tiny~0.108
 Scalar::Util~1.50
 Socket~2.027
 Term::ANSIColor~4.06
