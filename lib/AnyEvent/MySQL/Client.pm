@@ -238,9 +238,11 @@ sub connect ($%) {
     }
     $packet->_end;
 
-    $self->{capabilities} = CLIENT_LONG_PASSWORD | CLIENT_FOUND_ROWS |
+    my $req_caps = CLIENT_FOUND_ROWS |
         CLIENT_LONG_FLAG | CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 |
         CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION;
+    $self->{capabilities} = $req_caps |
+        CLIENT_LONG_PASSWORD; # CLIENT_MYSQL in MariaDB
     $charset = $packet->{character_set} if not defined $charset;
     $self->{character_set} = $charset;
 
@@ -254,7 +256,7 @@ sub connect ($%) {
       $self->{capabilities} |= CLIENT_SSL;
     }
 
-    unless (($packet->{capability_flags} | $self->{capabilities}) == $packet->{capability_flags}) {
+    unless (($packet->{capability_flags} & $req_caps) == $req_caps) {
       die bless {is_exception => 1,
                  packet => $packet,
                  message => "Server does not have some capability: Server $packet->{capability_flags} / Client $self->{capabilities}"}, __PACKAGE__ . '::Result';
