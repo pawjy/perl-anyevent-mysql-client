@@ -1,4 +1,4 @@
-AnyEvent::Handle
+AnyEvent~7.14
 Carp~1.50
 Class::Accessor::Lite~0.08
 Cwd~3.75
@@ -10,7 +10,7 @@ Digest::SHA~6.02
 Exporter::Lite~0.08
 File::Copy::Recursive~0.44
 File::Path~2.16
-File::Slurp~9999.25
+File::Slurp~9999.26
 File::Temp~0.2309
 Getopt::Long~2.5
 MRO::Compat~0.13
