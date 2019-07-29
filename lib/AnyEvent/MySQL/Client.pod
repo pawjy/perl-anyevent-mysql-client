@@ -63,8 +63,9 @@ domain socket.
 Whether TLS (SSL) is used to connect to the server or not.  If
 specified, the value must be a hash reference, which is used to create
 L<AnyEvent::TLS> context object.  Semantics of these options are same
-as L<AnyEvent::TLS>, except that C<verify> option's default is enabled
-(true).  If not specified, TLS is not used.  An example:
+as L<AnyEvent::TLS> constructor options, except that C<verify> option
+is enabled (true) by default.  If not specified, TLS is not used.  An
+example:
 
   $client->connect (..., tls => {
     verify => 1,
@@ -454,7 +455,7 @@ Thanks to suzak and hatz48.
 
 =head1 LICENSE
 
-Copyright 2014-2018 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2019 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

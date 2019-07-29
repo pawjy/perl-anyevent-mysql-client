@@ -263,6 +263,13 @@ sub connect ($%) {
     }
 
     if (defined $args{tls}) {
+      my $ctx_args = {%{$args{tls}}};
+      $ctx_args->{verify} //= 1;
+      ## AnyEvent (7.16 Fri Jul 19 18:00:21 CEST 2019) changed default
+      ## |dh| value from |schmorp1539| to |ffdhe3072| but some
+      ## environments we support do not have it :-<
+      $ctx_args->{dh} //= 'schmorp1539';
+      
       ## <http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::SSLRequest>
       my $req = AnyEvent::MySQL::Client::SentPacket->new (1);
       $req->_int4 ($self->{capabilities});
@@ -288,7 +295,7 @@ sub connect ($%) {
           $_[0]->on_starttls (undef);
         });
         $_[0]->on_drain (undef);
-        $_[0]->starttls ('connect', {verify => 1, %{$args{tls}}});
+        $_[0]->starttls ('connect', $ctx_args);
       });
       $self->{handle}->start_read;
       return $promise;
@@ -1514,7 +1521,7 @@ sub stringify ($) {
 
 =head1 LICENSE
 
-Copyright 2014 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2019 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
