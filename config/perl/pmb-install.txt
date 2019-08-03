@@ -1,4 +1,4 @@
-AnyEvent::IO
+AnyEvent~7.16
 Carp~1.50
 Class::Accessor::Lite~0.08
 Cwd~3.75
