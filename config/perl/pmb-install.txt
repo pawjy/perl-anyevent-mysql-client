@@ -1,5 +1,6 @@
 AnyEvent~7.17
 AnyEvent::FileLock~0.06
+AnyEvent::Handle
 Canary::Stability~2013
 Carp~1.50
 Class::Accessor::Lite~0.08
@@ -20,7 +21,7 @@ Method::WeakCallback~0.04
 Module::Runtime~0.016
 Net::SSLeay~1.88
 Path::Class~0.37
-Path::Tiny~0.110
+Path::Tiny~0.112
 Scalar::Util~1.53
 Socket~2.029
 Term::ANSIColor~5.01
