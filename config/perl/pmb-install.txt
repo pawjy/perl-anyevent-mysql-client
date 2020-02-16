@@ -26,6 +26,6 @@ Socket~2.029
 Term::ANSIColor~5.01
 Test::Class~0.50
 Test::More~1.302171
-Test::mysqld~1.0012
+Test::mysqld~1.0013
 Time::HiRes~1.9760
 Try::Tiny~0.30
