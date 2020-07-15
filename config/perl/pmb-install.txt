@@ -13,7 +13,7 @@ Digest::SHA~6.02
 Exporter::Lite~0.08
 File::Copy::Recursive~0.45
 File::Path~2.16
-File::Slurp~9999.30
+File::Slurp~9999.32
 File::Temp~0.2309
 Getopt::Long~2.51
 MRO::Compat~0.13
@@ -23,10 +23,10 @@ Net::SSLeay~1.88
 Path::Class~0.37
 Path::Tiny~0.114
 Scalar::Util~1.55
-Socket~2.029
+Socket~2.030
 Term::ANSIColor~5.01
-Test::Builder~1.302175
 Test::Class~0.50
+Test::More~1.302175
 Test::mysqld~1.0013
 Time::HiRes~1.9760
 Try::Tiny~0.30
