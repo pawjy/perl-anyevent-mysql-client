@@ -1,6 +1,5 @@
 AnyEvent~7.17
 AnyEvent::FileLock~0.06
-AnyEvent::IO
 Canary::Stability~2013
 Carp~1.50
 Class::Accessor::Lite~0.08
@@ -12,7 +11,7 @@ Devel::CheckLib~1.14
 Digest::SHA~6.02
 Exporter::Lite~0.08
 File::Copy::Recursive~0.45
-File::Path~2.16
+File::Path~2.17
 File::Slurp~9999.32
 File::Temp~0.2309
 Getopt::Long~2.51
