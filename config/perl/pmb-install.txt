@@ -1,5 +1,6 @@
 AnyEvent~7.17
 AnyEvent::FileLock~0.06
+AnyEvent::IO
 Canary::Stability~2013
 Carp~1.50
 Class::Accessor::Lite~0.08
@@ -11,10 +12,10 @@ Devel::CheckLib~1.14
 Digest::SHA~6.02
 Exporter::Lite~0.08
 File::Copy::Recursive~0.45
-File::Path~2.17
+File::Path~2.18
 File::Slurp~9999.32
-File::Temp~0.2309
-Getopt::Long~2.51
+File::Temp~0.2311
+Getopt::Long~2.52
 MRO::Compat~0.13
 Method::WeakCallback~0.04
 Module::Runtime~0.016
@@ -25,7 +26,7 @@ Scalar::Util~1.55
 Socket~2.030
 Term::ANSIColor~5.01
 Test::Class~0.50
-Test::More~1.302175
+Test::More~1.302183
 Test::mysqld~1.0013
-Time::HiRes~1.9760
+Time::HiRes~1.9764
 Try::Tiny~0.30
