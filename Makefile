@@ -6,6 +6,7 @@ GIT = git
 
 updatenightly: local/bin/pmbp.pl \
     clean-lib/AnyEvent/MySQL/Client/Promise.pm \
+    clean-test-deps \
     lib/AnyEvent/MySQL/Client/Promise.pm
 	$(CURL) -s -S -L https://gist.githubusercontent.com/wakaba/34a71d3137a52abb562d/raw/gistfile1.txt | sh
 	$(GIT) add modules t_deps/modules
@@ -47,7 +48,18 @@ PROVE = ./prove
 
 test: test-deps test-main
 
-test-deps: deps
+test-deps: deps test-deps-modules
+
+test-deps-modules: \
+    t_deps/lib/Web/Transport/FindPort.pm t_deps/lib/Web/Transport/_Defs.pm
+
+clean-test-deps:
+	rm t_deps/lib/Web/Transport/*.pm
+
+t_deps/lib/Web/Transport/FindPort.pm:
+	$(CURL) -sSLf https://raw.githubusercontent.com/manakai/perl-web-resource/master/lib/Web/Transport/FindPort.pm > $@
+t_deps/lib/Web/Transport/_Defs.pm:
+	$(CURL) -sSLf https://raw.githubusercontent.com/manakai/perl-web-resource/master/lib/Web/Transport/_Defs.pm > $@
 
 test-main:
 	$(PROVE) t/*.t
