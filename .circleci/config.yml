@@ -2,10 +2,10 @@
    "jobs" : {
       "build" : {
          "environment" : {
-            "CIRCLE_ARTIFACTS" : "/tmp/circle-artifacts"
+            "CIRCLE_ARTIFACTS" : "/tmp/circle-artifacts/build"
          },
          "machine" : {
-            "enabled" : true
+            "image" : "ubuntu-2004:202008-01"
          },
          "steps" : [
             "checkout",
@@ -16,17 +16,14 @@
             },
             {
                "store_artifacts" : {
-                  "path" : "/tmp/circle-artifacts"
+                  "path" : "/tmp/circle-artifacts/build"
                }
             }
          ]
       },
       "gaa4" : {
-         "environment" : {
-            "CIRCLE_ARTIFACTS" : "/tmp/circle-artifacts"
-         },
          "machine" : {
-            "enabled" : true
+            "image" : "ubuntu-2004:202008-01"
          },
          "steps" : [
             "checkout",
