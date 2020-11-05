@@ -755,15 +755,18 @@ sub statement_execute ($$;$$) {
   return $self->{command_promise} = $self->{command_promise}->then (sub {
     $OnActionStart->(state => $action_state);
 
+    ## <https://dev.mysql.com/doc/internals/en/com-stmt-execute.html>
     my $packet = AnyEvent::MySQL::Client::SentPacket->new (0);
     $packet->_int1 (COM_STMT_EXECUTE);
     $packet->_int4 (0+$statement_id);
     $packet->_int1 (0); # flags
     $packet->_int4 (1); # iteration_count
-    $packet->_string_var ($params->{null_bitmap}); # NULL bitmap
-    $packet->_int1 (1);
-    $packet->_string_eof (${$params->{types_ref}});
-    $packet->_string_eof (${$params->{values_ref}});
+    unless ($params->{null_bitmap} eq '') {
+      $packet->_string_var ($params->{null_bitmap}); # NULL bitmap
+      $packet->_int1 (1);
+      $packet->_string_eof (${$params->{types_ref}});
+      $packet->_string_eof (${$params->{values_ref}});
+    }
     $packet->_end;
     $self->_push_send_packet ($packet);
     return $self->_push_read_packet
@@ -1521,7 +1524,7 @@ sub stringify ($) {
 
 =head1 LICENSE
 
-Copyright 2014-2019 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2020 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
