@@ -11,7 +11,7 @@ updatenightly: local/bin/pmbp.pl \
 	$(CURL) -s -S -L https://gist.githubusercontent.com/wakaba/34a71d3137a52abb562d/raw/gistfile1.txt | sh
 	$(GIT) add modules t_deps/modules
 	perl local/bin/pmbp.pl --update
-	$(GIT) add config lib
+	$(GIT) add config lib t_deps/lib
 	$(CURL) -sSLf https://raw.githubusercontent.com/wakaba/ciconfig/master/ciconfig | RUN_GIT=1 REMOVE_UNUSED=1 perl
 
 ## ------ Setup ------
@@ -49,6 +49,7 @@ PROVE = ./prove
 test: test-deps test-main
 
 test-deps: deps test-deps-modules
+	docker pull mariadb &
 
 test-deps-modules: \
     t_deps/lib/Web/Transport/FindPort.pm t_deps/lib/Web/Transport/_Defs.pm
