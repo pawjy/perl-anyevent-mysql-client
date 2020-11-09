@@ -87,8 +87,10 @@ sub test_db ($) {
   });
 } # test_db
 
+## MariaDB: <https://hub.docker.com/_/mariadb>
 #my $MySQLImage = 'mysql/mysql-server';
-my $MySQLImage = 'mariadb';
+my $MySQLImage = $ENV{TEST_MYSQL_IMAGE} || 'mariadb';
+
 sub start_server () {
   my $tempdir = tempdir (CLEANUP => 1);
   my $temp_path = path ($tempdir);
