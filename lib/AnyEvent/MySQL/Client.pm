@@ -17,8 +17,10 @@ sub CHARSET_UTF8 () { 33 } # utf8_general_ci
 sub CHARSET_BINARY () { 63 } # binary
 
 ## Capability flags
-## <http://dev.mysql.com/doc/internals/en/capability-flags.html>.
-sub CLIENT_LONG_PASSWORD                  () { 1 }
+## MySQL: <http://dev.mysql.com/doc/internals/en/capability-flags.html>.
+## MariaDB: <https://mariadb.com/kb/en/connection/#capabilities>
+sub CLIENT_LONG_PASSWORD                  () { 1 } # MySQL
+sub CLIENT_MYSQL                          () { 1 } # MariaDB
 sub CLIENT_FOUND_ROWS                     () { 2 }
 sub CLIENT_LONG_FLAG                      () { 4 }
 sub CLIENT_CONNECT_WITH_DB                () { 8 }
@@ -200,6 +202,8 @@ sub connect ($%) {
        timeout => $self->connection_packet_timeout)->then (sub {
     my $packet = $handshake_packet = $_[0];
 
+    ## MySQL: <https://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol%3A%3AHandshakeV10>
+    ## MariaDB: <https://mariadb.com/kb/en/connection/#initial-handshake-packet>
     $packet->_int (1 => 'version');
     unless ($packet->{version} == 0x0A) {
       $self->_terminate_connection;
@@ -210,6 +214,7 @@ sub connect ($%) {
     }
 
     $packet->_string_null ('server_version');
+    #$self->{is_mariadb} = $packet->{server_version} =~ /MariaDB/;
     $packet->_int (4 => 'connection_id');
     $packet->_string (8 => 'auth_plugin_data');
     $packet->_skip (1);
@@ -224,7 +229,15 @@ sub connect ($%) {
       } else {
         $packet->_skip (1);
       }
-      $packet->_skip (10);
+      ## MySQL: string[10]reserved
+      ## MariaDB: string<6>filter; (server cap. & CLIENT_MYSQL) ? string<4>filter : int<4> server cap. 3 (MariaDB 10.2+);
+      #if ($self->{is_mariadb} and
+      #    not ($packet->{capability_flags} & CLIENT_MYSQL)) {
+      #  $packet->_skip (6);
+      #  $packet->_int (4 => 'capability_flags_3');
+      #} else {
+        $packet->_skip (10);
+      #}
       if ($packet->{capability_flags} & CLIENT_SECURE_CONNECTION) {
         my $length = ($packet->{auth_plugin_data_len} || 0) - 8;
         $length = 13 if $length < 13;
@@ -243,6 +256,7 @@ sub connect ($%) {
         CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION;
     $self->{capabilities} = $req_caps |
         CLIENT_LONG_PASSWORD; # CLIENT_MYSQL in MariaDB
+    #$self->{capabilities_high} = 0; # unused
     $charset = $packet->{character_set} if not defined $charset;
     $self->{character_set} = $charset;
 
@@ -256,10 +270,11 @@ sub connect ($%) {
       $self->{capabilities} |= CLIENT_SSL;
     }
 
+    ## Check whether the server has all capabilities we require.
     unless (($packet->{capability_flags} & $req_caps) == $req_caps) {
       die bless {is_exception => 1,
                  packet => $packet,
-                 message => "Server does not have some capability: Server $packet->{capability_flags} / Client $self->{capabilities}"}, __PACKAGE__ . '::Result';
+                 message => "Server does not have some capability: Server $packet->{capability_flags} / Client $self->{capabilities} (Server: |$packet->{server_version}|)"}, __PACKAGE__ . '::Result';
     }
 
     if (defined $args{tls}) {
@@ -270,12 +285,20 @@ sub connect ($%) {
       ## environments we support do not have it :-<
       $ctx_args->{dh} //= 'schmorp1539';
       
-      ## <http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::SSLRequest>
+      ## MySQL: <http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::SSLRequest>
+      ## MariaDB: <https://mariadb.com/kb/en/connection/#sslrequest-packet>
       my $req = AnyEvent::MySQL::Client::SentPacket->new (1);
       $req->_int4 ($self->{capabilities});
-      $req->_int4 (0x1_000000);
+      $req->_int4 (0x1_000000); # max packet size
       $req->_int1 ($charset);
-      $req->_null (23);
+      ## MariaDB: string<19>reserved; (cap & CLIENT_MYSQL) ? string<4>reserved : int<4> ext. client cap.;
+      #if ($self->{is_mariadb} and
+      #    not ($self->{capabilities} & CLIENT_MYSQL)) {
+      #  $req->_null (19);
+      #  $req->_int4 ($self->{capabilities_high});
+      #} else {
+        $req->_null (23);
+      #}
       $req->_end;
       $self->_push_send_packet ($req);
 
@@ -304,11 +327,19 @@ sub connect ($%) {
     }
   })->then (sub {
     my ($packet, $next_id) = @{$_[0]};
+    ## MariaDB: <https://mariadb.com/kb/en/connection/#sslrequest-packet>
     my $response = AnyEvent::MySQL::Client::SentPacket->new ($next_id);
     $response->_int4 ($self->{capabilities});
-    $response->_int4 (0x1_000000);
+    $response->_int4 (0x1_000000); # max packet size
     $response->_int1 ($charset);
-    $response->_null (23);
+    ## MariaDB: string<19>reserved; (server cap. & CLIENT_MYSQL) ? string<4>reserved : int<4>ext. client cap.;
+    #if ($self->{is_mariadb} and
+    #    not ($self->{capabilities} & CLIENT_MYSQL)) {
+    #  $response->_null (4);
+    #  $response->_int4 ($self->{capabilities_high});
+    #} else {
+      $response->_null (23);
+    #}
     $response->_string_null (defined $args{username} ? $args{username} : '');
 
     ## Secure password authentication (|mysql_native_password|)
