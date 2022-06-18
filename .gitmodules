@@ -29,3 +29,4 @@
 [submodule "t_deps/modules/web-encodings"]
 	path = t_deps/modules/web-encodings
 	url = https://github.com/manakai/perl-web-encodings
+	track = master

@@ -1,9 +1,7 @@
 {
-  "travisci": {
+  "github": {
     "pmbp": "5.12+",
-    "merger": 1
-  },
-  "circleci": {
-    "gaa": 1
+    "gaa": true,
+    "merger": true
   }
 }
