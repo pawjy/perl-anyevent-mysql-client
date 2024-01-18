@@ -10,10 +10,6 @@
 	path = modules/promise
 	url = https://github.com/wakaba/perl-promise
 	track = master
-[submodule "t_deps/modules/promised-mysqld"]
-	path = t_deps/modules/promised-mysqld
-	url = https://github.com/wakaba/perl-promised-mysqld
-	track = master
 [submodule "t_deps/modules/promised-command"]
 	path = t_deps/modules/promised-command
 	url = https://github.com/wakaba/perl-promised-command
@@ -29,4 +25,24 @@
 [submodule "t_deps/modules/web-encodings"]
 	path = t_deps/modules/web-encodings
 	url = https://github.com/manakai/perl-web-encodings
+	track = master
+[submodule "t_deps/modules/serverset"]
+	path = t_deps/modules/serverset
+	url = https://github.com/pawjy/serverset
+	track = master
+[submodule "t_deps/modules/web-resource"]
+	path = t_deps/modules/web-resource
+	url = https://github.com/manakai/perl-web-resource
+	track = master
+[submodule "t_deps/modules/web-url"]
+	path = t_deps/modules/web-url
+	url = https://github.com/manakai/perl-web-url
+	track = master
+[submodule "t_deps/modules/web-datetime"]
+	path = t_deps/modules/web-datetime
+	url = https://github.com/manakai/perl-web-datetime
+	track = master
+[submodule "t_deps/modules/json-ps"]
+	path = t_deps/modules/json-ps
+	url = https://github.com/wakaba/perl-json-ps
 	track = master

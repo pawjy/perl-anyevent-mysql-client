@@ -22,6 +22,7 @@ if ($ReuseCerts) {
   system ('perl', $generate_certs_path, $certs_path, 'server', 'client1', 'client2') == 0 or die $?;
   my $cert_time = time;
   $wait_until_time = $cert_time + 60 - [gmtime $cert_time]->[0];
+  chmod 0777, $certs_path;
 }
 $certs_path = $certs_path->absolute;
 
@@ -339,6 +340,11 @@ RUN sub {
   $dsn =~ s/^DBI:mysql://i;
   %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 
+  {
+    my $dsn = test_dsn 'root';
+    $dsn =~ s/^DBI:mysql://i;
+    %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
+
   my $client = AnyEvent::MySQL::Client->new;
   my %connect;
   if (defined $dsn{port}) {
@@ -359,11 +365,15 @@ RUN sub {
   })->then (sub {
     return $client->disconnect;
   })->to_cv->recv;
-}, \%MyCnfArgs;
+  }
+}, {
+  path => $certs_path,
+  mycnf => \%MyCnfArgs,
+};
 
 =head1 LICENSE
 
-Copyright 2014-2018 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2024 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

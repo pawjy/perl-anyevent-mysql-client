@@ -5,7 +5,6 @@ Canary::Stability~2013
 Carp~1.50
 Class::Accessor::Lite~0.08
 Cwd~3.75
-DBD::mysql~4.050
 DBI~1.643
 DBIx::RewriteDSN~0.05
 Devel::CheckLib~1.14
@@ -27,6 +26,5 @@ Socket~2.030
 Term::ANSIColor~5.01
 Test::Class~0.50
 Test::More~1.302183
-Test::mysqld~1.0013
 Time::HiRes~1.9764
 Try::Tiny~0.30

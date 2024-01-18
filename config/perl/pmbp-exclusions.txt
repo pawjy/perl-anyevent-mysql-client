@@ -8,3 +8,11 @@
 - "../../t_deps/modules/promised-file" build tests
 - "../../t_deps/modules/anyevent-mysql-client" build tests
 - "../../t_deps/modules/web-encodings" build tests
+- "../../t_deps/modules/web-resource" build tests
+- "../../t_deps/modules/web-url" build tests
+- "../../t_deps/modules/web-datetime" build tests
+- "../../t_deps/modules/json-ps" build tests
+- "../../t_deps/modules/dongry" build tests dbi datetime mp
+- "../../t_deps/modules/json-functions-xs" build tests
+- "../../t_deps/modules/ooutils" build tests classdiamondgenerator classregistry objectcachesmethod operationresponse
+- "../../t_deps/modules/anyevent-mysql-client" build tests

@@ -10,7 +10,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     return $client->ping;
@@ -60,7 +60,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     my $result = $_[0];
@@ -87,7 +87,7 @@ test {
 } n => 1, name => 'after disconnect';
 
 RUN sub {
-  my $dsn = test_dsn 'hoge', unix => 1;
+  my $dsn = test_dsn 'hoge', tcp => 1;
   $dsn =~ s/^DBI:mysql://i;
   %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 };

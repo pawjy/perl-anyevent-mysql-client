@@ -703,7 +703,7 @@ test {
 } n => 2, name => 'connect then disconnect soon';
 
 RUN sub {
-  my $dsn = test_dsn 'hoge';
+  my $dsn = test_dsn 'root';
   $dsn =~ s/^DBI:mysql://i;
   %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 
