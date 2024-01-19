@@ -14,7 +14,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     my $result = $_[0];
@@ -32,7 +32,7 @@ test {
     return $client->disconnect;
   })->then (sub {
     return $client->connect
-        (hostname => 'unix/', port => $dsn{mysql_socket},
+        (hostname => $dsn{host}, port => $dsn{port},
          username => $dsn{user}, password => $dsn{password},
          database => $dsn{dbname});
   })->then (sub {
@@ -68,7 +68,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     return $client->disconnect->then (sub {
@@ -98,11 +98,11 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     return $client->connect
-        (hostname => 'unix/', port => $dsn{mysql_socket},
+        (hostname => $dsn{host}, port => $dsn{port},
          username => $dsn{user}, password => $dsn{password},
          database => $dsn{dbname})->catch (sub {
       my $result = $_[0];
@@ -139,7 +139,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password})->then (sub {
     my @row;
     return $client->query (q{show databases}, sub {
@@ -234,7 +234,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => rand,
        database => $dsn{dbname})->then (sub {
     test {
@@ -295,7 +295,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     return $client->ping->DIE;
@@ -317,7 +317,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname},
        tls => {})->then (sub {
@@ -329,7 +329,7 @@ test {
     test {
       ok $x->is_exception;
       like $x->message, qr{TLS};
-      ok $x->packet;
+      #ok $x->packet; # has a packet if MariaDB, none if MySQL
     } $c;
   })->then (sub {
     return $client->disconnect;
@@ -340,13 +340,13 @@ test {
       undef $client;
     } $c;
   });
-} n => 3, name => 'server does not support TLS';
+} n => 2, name => 'server does not support TLS';
 
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => 'gagewagewaea', password => 'hogefugaaaaafegwat3g',
        database => $dsn{dbname})->then (sub {
     test {
@@ -374,7 +374,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $USER1, password => 'hogefugaaaaafegwat3g',
        database => $dsn{dbname})->then (sub {
     test {
@@ -402,7 +402,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password})->then (sub {
     my @row;
     return $client->query (q{select current_user()}, sub {
@@ -438,7 +438,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $USER1, password => $PASS1)->then (sub {
     my @row;
     return $client->query (q{select current_user()}, sub {
@@ -450,8 +450,9 @@ test {
       is_deeply $result, [$USER1 . '@localhost'];
     } $c;
   })->catch (sub {
+    my $e = $_[0];
     test {
-      ok 0;
+      ok 0, $e;
     } $c;
     return undef;
   })->then (sub {
@@ -470,7 +471,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => "\x{100}", password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     test {
@@ -498,7 +499,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => "\x{5000}",
        database => $dsn{dbname})->then (sub {
     test {
@@ -526,7 +527,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => "\x{5000}")->then (sub {
     test {
@@ -554,7 +555,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        character_set => 'default',
        username => $USER2, password => $PASS2)->then (sub {
     my @row;
@@ -587,7 +588,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        character_set => 235,
        username => $USER2, password => $PASS2,
        database => $dsn{dbname})->then (sub {
@@ -615,7 +616,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        character_set => 'utf-12345',
        username => $USER1, password => $PASS1,
        database => $dsn{dbname})->then (sub {
@@ -644,7 +645,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => "ho\x00ha", password => $PASS1,
        database => $dsn{dbname})->then (sub {
     test {
@@ -679,7 +680,7 @@ test {
   my $client = AnyEvent::MySQL::Client->new;
   my $connect_done;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     $connect_done++;
@@ -707,7 +708,7 @@ test {
 } n => 2, name => 'connect then disconnect soon';
 
 RUN sub {
-  my $dsn = test_dsn 'root';
+  my $dsn = test_dsn 'root', tcp => 1;
   $dsn =~ s/^DBI:mysql://i;
   %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 

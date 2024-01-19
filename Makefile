@@ -58,9 +58,13 @@ clean-test-deps:
 	rm t_deps/lib/Web/Transport/*.pm
 
 t_deps/lib/Web/Transport/FindPort.pm:
+	mkdir -p t_deps/lib/Web/Transport
 	$(CURL) -sSLf https://raw.githubusercontent.com/manakai/perl-web-resource/master/lib/Web/Transport/FindPort.pm > $@
 t_deps/lib/Web/Transport/_Defs.pm:
+	mkdir -p t_deps/lib/Web/Transport
 	$(CURL) -sSLf https://raw.githubusercontent.com/manakai/perl-web-resource/master/lib/Web/Transport/_Defs.pm > $@
 
 test-main:
 	$(PROVE) t/*.t
+
+## License: Public Domain.

@@ -87,6 +87,7 @@ push @EXPORT, qw(RUN);
 sub RUN (;$$) {
   my $init = shift || sub { };
   my $args = shift || {};
+  $args->{mysql_version} //= $ENV{TEST_MYSQL_VERSION};
 
   note "Servers...";
   my $ac = AbortController->new;

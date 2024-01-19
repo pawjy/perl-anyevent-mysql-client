@@ -53,6 +53,7 @@ sub run ($%) {
         database_name_suffix => $args->{mysqld_database_name_suffix},
         volume_path => $args->{path},
         mycnf => $args->{mycnf},
+        mysql_version => $args->{mysql_version},
       },
       _ => {},
     }; # $result->{server_params}
