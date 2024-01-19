@@ -450,8 +450,9 @@ test {
       is_deeply $result, [$USER1 . '@localhost'];
     } $c;
   })->catch (sub {
+    my $e = $_[0];
     test {
-      ok 0;
+      ok 0, $e;
     } $c;
     return undef;
   })->then (sub {

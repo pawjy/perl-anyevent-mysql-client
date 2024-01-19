@@ -447,7 +447,7 @@ test {
   })->then (sub {
     my $result = $_[0];
     test {
-      is_deeply $result, [$USER1 . '@localhost'];
+      is_deeply $result, [$USER1 . '@%'];
     } $c;
   })->catch (sub {
     my $e = $_[0];
@@ -565,7 +565,7 @@ test {
   })->then (sub {
     my $result = $_[0];
     test {
-      is_deeply $result, [$USER2 . '@localhost'];
+      is_deeply $result, [$USER2 . '@%'];
     } $c;
   })->catch (sub {
     test {
@@ -728,9 +728,9 @@ RUN sub {
     database => 'mysql',
     character_set => 'default',
   )->then (sub {
-    return $client->query ('grant all privileges on *.* to "'.$USER1.'"@"localhost" identified by "'.$PASS1.'"');
+    return $client->query ('grant all privileges on *.* to "'.$USER1.'"@"%" identified by "'.$PASS1.'"');
   })->then (sub {
-    return $client->query ("grant all privileges on *.* to '".$USER2."'\@'localhost' identified by '".$PASS2."'");
+    return $client->query ("grant all privileges on *.* to '".$USER2."'\@'%' identified by '".$PASS2."'");
   })->then (sub {
     return $client->disconnect;
   })->to_cv->recv;
