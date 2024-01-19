@@ -58,10 +58,13 @@ sub test_dsn ($;%) {
     my $escaped = $dsn->{dbname} = $name . '_test';
     $escaped =~ s/`/``/g;
     return $client->query ("CREATE DATABASE IF NOT EXISTS `$escaped`")->then (sub {
+      die $_[0] unless $_[0]->is_success;
       return $client->query (
         encode_web_utf8 sprintf q{grant all on `%s`.* to '%s'@'%s'},
         $escaped, $test_dsn->{user}, '%',
       );
+    })->then (sub {
+      die $_[0] unless $_[0]->is_success;
     });
   })->finally (sub {
     return $client->disconnect;

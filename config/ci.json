@@ -1,6 +1,12 @@
 {
   "github": {
     "pmbp": "5.12+",
+    "env_matrix": {
+      "TEST_MYSQL_VERSION": [
+        "",
+        "mysql5.6"
+      ]
+    },
     "gaa": true,
     "merger": true
   }
