@@ -34,6 +34,8 @@ sub run ($%) {
           $data->{local_dsn_options}->{root} = {%{$mysqld_data->{local_dsn_options}->{test}}};
           $data->{local_dsn_options}->{root}->{user} = 'root';
           $data->{local_dsn_options}->{root}->{password} = $self->key ('mysqld_root_password');
+
+          $data->{mysql_version} = $mysqld_data->{mysql_version};
           
           return [$data, undef];
         });
@@ -54,6 +56,7 @@ sub run ($%) {
         volume_path => $args->{path},
         mycnf => $args->{mycnf},
         mysql_version => $args->{mysql_version},
+        old_sql_mode => $args->{old_sql_mode},
       },
       _ => {},
     }; # $result->{server_params}

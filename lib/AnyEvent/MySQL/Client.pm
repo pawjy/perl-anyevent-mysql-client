@@ -201,8 +201,9 @@ sub connect ($%) {
       (label => 'initial handshake',
        timeout => $self->connection_packet_timeout)->then (sub {
     my $packet = $handshake_packet = $_[0];
-
+    
     ## MySQL: <https://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol%3A%3AHandshakeV10>
+    ## <https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_handshake_v10.html>
     ## MariaDB: <https://mariadb.com/kb/en/connection/#initial-handshake-packet>
     $packet->_int (1 => 'version');
     unless ($packet->{version} == 0x0A) {

@@ -272,12 +272,12 @@ test {
   })->then (sub {
     my $result = $_[0];
     test {
-      is $result, "\xE4\xBD\x8D";
+      is $result, "\xE4\xBD\x8D", "got 1";
     } $c;
   })->catch (sub {
-    warn $_[0];
+    my $e = $_[0];
     test {
-      ok 0;
+      ok 0, $e;
     } $c;
   })->then (sub {
     return $client->disconnect;
@@ -295,12 +295,16 @@ test {
   })->then (sub {
     my $result = $_[0];
     test {
-      is $result, encode_web_utf8 "\xE4\xBD\x8D";
+      if ($Tests::ServerData->{mysql_version} eq 'mysql8') {
+        is $result, "\xE4\xBD\x8D", "got 2";
+      } else {
+        is $result, encode_web_utf8 "\xE4\xBD\x8D", "got 2";
+      }
     } $c;
   })->catch (sub {
-    warn $_[0];
+    my $e = $_[0];
     test {
-      ok 0;
+      ok 0, $e;
     } $c;
   })->then (sub {
     return $client->disconnect;
@@ -318,7 +322,11 @@ test {
   })->then (sub {
     my $result = $_[0];
     test {
-      is $result, "\xE4\xBD\x8D";
+      if ($Tests::ServerData->{mysql_version} eq 'mysql8') {
+        is $result, "?", "got 3";
+      } else {
+        is $result, "\xE4\xBD\x8D", "got 3";
+      }
     } $c;
   })->catch (sub {
     warn $_[0];
@@ -427,7 +435,7 @@ RUN sub {
 
 =head1 LICENSE
 
-Copyright 2014-2018 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2024 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

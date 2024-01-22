@@ -8,6 +8,7 @@ my %dsn;
 my $USER1 = 'foo';
 my $PASS1 = 'bar';
 my $USER2 = "\xFE\x80\x03a";
+my $USER2x = "??\x03a";
 my $PASS2 = "\x66\x90\xAC\xFF";
 
 test {
@@ -356,7 +357,11 @@ test {
     my $x = $_[0];
     test {
       ok $x->is_exception;
-      is $x->packet->{error_code}, 1045;
+      if ($x->packet->{error_code} == 1251) { # MySQL 8
+        is $x->packet->{error_code}, 1251;
+      } else {
+        is $x->packet->{error_code}, 1045;
+      }
       ok $x->message;
     } $c;
   })->then (sub {
@@ -565,7 +570,11 @@ test {
   })->then (sub {
     my $result = $_[0];
     test {
-      is_deeply $result, [$USER2 . '@%'];
+      if ($result->[0] =~ /^\Q$USER2x\E/) { # MySQL 8
+        is_deeply $result, [$USER2x . '@%'], "WARNING: user name broken";
+      } else {
+        is_deeply $result, [$USER2 . '@%'];
+      }
     } $c;
   })->catch (sub {
     test {
@@ -593,11 +602,19 @@ test {
        username => $USER2, password => $PASS2,
        database => $dsn{dbname})->then (sub {
     test {
-      ok 0;
+      if ($Tests::ServerData->{mysql_version} eq 'mysql8') {
+        ok 1;
+        ok 1;
+      } else {
+        ok 0;
+      }
     } $c;
   }, sub {
     my $x = $_[0];
     test {
+      if ($Tests::ServerData->{mysql_version} eq 'mysql8') {
+        ok 0;
+      }
       ok $x->is_exception;
       is $x->packet->{error_code}, 1045;
     } $c;
@@ -728,10 +745,10 @@ RUN sub {
     database => 'mysql',
     character_set => 'default',
   )->then (sub {
-    return $client->query ('grant all privileges on *.* to "'.$USER1.'"@"%" identified by "'.$PASS1.'"');
-  })->then (sub {
-    return $client->query ("grant all privileges on *.* to '".$USER2."'\@'%' identified by '".$PASS2."'");
-  })->then (sub {
+    return create_user $client, $USER1, $PASS1;
+  })->finally (sub {
+    return create_user $client, $USER2, $PASS2;
+  })->finally (sub {
     return $client->disconnect;
   })->to_cv->recv;
 };

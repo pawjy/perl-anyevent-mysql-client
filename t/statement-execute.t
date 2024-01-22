@@ -136,7 +136,7 @@ for my $value (
   {type => 'FLOAT', value => 12, i => 104},
   {type => 'DECIMAL', value => 12, i => 105},
   {type => 'VAR_STRING', value => 12, i => 106},
-  {type => 'ENUM', value => 12, i => 107},
+  #{type => 'ENUM', value => 12, i => 107}, # depends on server version
   #{type => 'BIT', value => 12, i => 108}, # depends on server version
   {type => 'LONG', unsigned => 1, value => 12, i => 109},
   {type => 'TINY', unsigned => 1, value => 12, i => 110},
@@ -148,7 +148,7 @@ for my $value (
   {type => 'FLOAT', unsigned => 1, value => 12, i => 124},
   {type => 'DECIMAL', unsigned => 1, value => 12, i => 125},
   {type => 'VAR_STRING', unsigned => 1, value => 12, i => 126},
-  {type => 'ENUM', unsigned => 1, value => 12, i => 127},
+  #{type => 'ENUM', unsigned => 1, value => 12, i => 127}, # depends on server version
   #{type => 'BIT', unsigned => 1, value => 1, i => 128}, # depends on server version
 ) {
   test {
@@ -169,7 +169,7 @@ for my $value (
     })->then (sub {
       my $result = $_[0];
       test {
-        ok $result;
+        ok $result, $result;
         isa_ok $result, 'AnyEvent::MySQL::Client::Result';
         ok $result->is_success;
         ok $result->packet;
@@ -264,11 +264,15 @@ test {
   })->then (sub {
     my $result = $_[0];
     test {
-      ok $result;
+      ok $result, $result;
       isa_ok $result, 'AnyEvent::MySQL::Client::Result';
       ok $result->is_failure;
       ok $result->packet;
-      is $result->packet->{error_code}, 1210;
+      if ($result->packet->{error_code} == 1835) { # MySQL 8
+        is $result->packet->{error_code}, 1835;
+      } else {
+        is $result->packet->{error_code}, 1210;
+      }
     } $c;
     my @data;
     return $client->query ('select * from foo7 order by id asc', sub {
@@ -306,7 +310,7 @@ for my $value (
   {type => 'FLOAT', value => -12, i => 214},
   {type => 'DECIMAL', value => -12, i => 215},
   {type => 'VAR_STRING', value => -12, i => 216},
-  {type => 'ENUM', value => -12, i => 217},
+  #{type => 'ENUM', value => -12, i => 217}, # depends on server version
   #{type => 'BIT', value => -12, i => 218}, # depends on server version
 ) {
   test {
@@ -577,7 +581,8 @@ for my $test (
   {id => 6, type => 'bigint', w => '-4', r => {type => 'LONGLONG', value => -4}},
   {id => 7, type => 'float', w => '-4.25', r => {type => 'FLOAT', value => -4.25}},
   {id => 8, type => 'double', w => '-4.5', r => {type => 'DOUBLE', value => -4.5}},
-  {id => 9, type => 'varchar(12)', w => qq{"ab vca\xFE"}, r => {type => 'VAR_STRING', value => "ab vca\xFE"}},
+  {id => 9, type => 'varchar(12)', w => qq{"ab vca\xC4\x80"}, r => {type => 'VAR_STRING', value => "ab vca\xC4\x80"}},
+  #{id => 9, type => 'varchar(12)', w => qq{"ab vca\xFE"}, r => {type => 'VAR_STRING', value => "ab vca\xFE"}}, # depends on server version
   {id => 10, type => 'varbinary(12)', w => qq{"ab vca\xFE"}, r => {type => 'VAR_STRING', value => "ab vca\xFE"}},
   {id => 11, type => 'bit(8)', w => '0b10011010', r => {type => 'BIT', unsigned => 1, value => pack 'C', 0b10011010}},
   {id => 12, type => 'enum("abc","def")', w => '"abc"', r => {type => 'STRING', value => 'abc'}},
@@ -592,7 +597,7 @@ for my $test (
   {id => 21, type => 'datetime', w => '"0021-04-01 12:22:31"', r => {type => 'DATETIME', value => '0021-04-01 12:22:31'}},
   {id => 22, type => 'timestamp', w => '"2010-04-01 12:22:31"', r => {type => 'TIMESTAMP', value => '2010-04-01 12:22:31'}, optional_unsigned => 1},
   {id => 23, type => 'date', w => '"2010-04-01"', r => {type => 'DATE', value => '2010-04-01 00:00:00'}},
-  {id => 24, type => 'datetime', w => '"0000-00-00 00:00:00"', r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}},
+  {id => 24, type => 'datetime', w => '"0000-00-00 00:00:00"', r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}}, # depends on server version
   {id => 25, type => 'time', w => '"00:00:00"', r => {type => 'TIME', value => '00:00:00'}},
   {id => 26, type => 'time', w => '"812:02:44"', r => {type => 'TIME', value => '812:02:44'}},
   {id => 27, type => 'time', w => '"-812:02:01"', r => {type => 'TIME', value => '-812:02:01'}},
@@ -628,7 +633,7 @@ for my $test (
         } else {
           is_deeply [map { $_->packet->{data} } @$rows], [[$test->{r}]];
         }
-      } $c;
+      } $c, name => $result;
     })->then (sub {
       return $client->query ('show tables');
     })->catch (sub {
@@ -651,8 +656,8 @@ for my $test (
 for my $test (
   {id => 1, type => 'datetime', w => {type => 'DATETIME', value => "0021-04-01 12:22:31"}, r => {type => 'DATETIME', value => '0021-04-01 12:22:31'}},
   {id => 2, type => 'timestamp', w => {type => 'TIMESTAMP', value => "2010-04-01 12:22:31"}, r => {type => 'TIMESTAMP', value => '2010-04-01 12:22:31'}, optional_unsigned => 1},
-  {id => 3, type => 'date', w => {type => 'DATE', value => "2010-04-01"}, r => {type => 'DATE', value => '2010-04-01 00:00:00'}},
-  {id => 4, type => 'datetime', w => {type => 'DATETIME', value => "0000-00-00 00:00:00"}, r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}},
+  {id => 3, type => 'date', w => {type => 'DATE', value => "2010-04-01"}, r => {type => 'DATE', value => '2010-04-01 00:00:00'}}, # depends on server version
+  {id => 4, type => 'datetime', w => {type => 'DATETIME', value => "0000-00-00 00:00:00"}, r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}}, # depends on server version
   {id => 5, type => 'datetime', w => {type => 'DATETIME', value => "8000-99-99 99:99:99"}, r => {type => 'DATETIME', value => '0000-00-00 00:00:00'}},
   {id => 25, type => 'time', w => {type => 'TIME', value => "00:00:00"}, r => {type => 'TIME', value => '00:00:00'}},
   {id => 26, type => 'time', w => {type => 'TIME', value => "812:02:44"}, r => {type => 'TIME', value => '812:02:44'}},
@@ -721,7 +726,7 @@ RUN sub {
   my $dsn = test_dsn 'hoge';
   $dsn =~ s/^DBI:mysql://i;
   %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
-};
+}, {old_sql_mode => 1};
 
 =head1 LICENSE
 

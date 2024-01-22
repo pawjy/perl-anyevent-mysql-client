@@ -86,6 +86,27 @@ sub test_dsn ($;%) {
   }
 } # test_dsn
 
+push @EXPORT, qw(create_user);
+sub create_user ($$$;%) {
+  my ($client, $user, $password, %args) = @_;
+  if ($ServerData->{mysql_version} =~ /^mysql8?$/) {
+    my $sql = 'create user "'.$user.'"@"%" identified by "'.$password.'"';
+    $sql .= ' require subject "'.$args{tls_subject}.'"' if defined $args{tls_subject};
+    return $client->query ($sql)->then (sub {
+      die $_[0] unless $_[0]->is_success;
+      return $client->query ('grant all privileges on *.* to "'.$user.'"@"%"');
+    })->then (sub {
+      die $_[0] unless $_[0]->is_success;
+    });
+  } else {
+    my $sql = 'grant all privileges on *.* to "'.$user.'"@"%" identified by "'.$password.'"';
+    $sql .= ' require subject "'.$args{tls_subject}.'"' if defined $args{tls_subject};
+    return $client->query ($sql)->then (sub {
+      die $_[0] unless $_[0]->is_success;
+    });
+  }
+} # create_user
+
 push @EXPORT, qw(RUN);
 sub RUN (;$$) {
   my $init = shift || sub { };
@@ -99,7 +120,7 @@ sub RUN (;$$) {
     signal => $ac->signal,
   )->to_cv->recv;
   local $ServerData = $v->{data};
-
+  
   eval {
     $init->();
 

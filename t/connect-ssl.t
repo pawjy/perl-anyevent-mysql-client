@@ -360,11 +360,11 @@ RUN sub {
     password => $dsn{password},
     database => 'mysql',
     character_set => 'default',
-  )->then (sub {
-    return $client->query ('grant all privileges on *.* to "'.$SSL_USER.'"@"localhost" identified by "'.$SSL_PASS.'" require subject "/CN=client1.test"');
-  })->then (sub {
-    return $client->disconnect;
-  })->to_cv->recv;
+    )->then (sub {
+      return create_user $client, $SSL_USER, $SSL_PASS, tls_subject => "/CN=client1.test";
+    })->then (sub {
+      return $client->disconnect;
+    })->to_cv->recv;
   }
 }, {
   path => $certs_path,
