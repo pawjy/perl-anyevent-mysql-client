@@ -103,7 +103,7 @@ sub create_user ($$$;%) {
   } else {
     my $sql = 'create user "'.$user.'"@"%" identified';
     $sql .= ' by "'.$password.'"';
-    $sql .= ' require subject "'.$args{tls_subject}.'"' if defined $args{tls_subject};
+    #$sql .= ' require subject "'.$args{tls_subject}.'"' if defined $args{tls_subject};
     return $client->query ($sql)->then (sub {
       die $_[0] unless $_[0]->is_success;
       my $sql = 'grant all privileges on *.* to "'.$user.'"@"%" identified';
