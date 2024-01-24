@@ -90,7 +90,9 @@ push @EXPORT, qw(create_user);
 sub create_user ($$$;%) {
   my ($client, $user, $password, %args) = @_;
   if ($ServerData->{mysql_version} =~ /^mysql8?$/) {
-    my $sql = 'create user "'.$user.'"@"%" identified by "'.$password.'"';
+    my $sql = 'create user "'.$user.'"@"%" identified';
+    $sql .= ' with "mysql_native_password"' if $args{native_password};
+    $sql .= ' by "'.$password.'"';
     $sql .= ' require subject "'.$args{tls_subject}.'"' if defined $args{tls_subject};
     return $client->query ($sql)->then (sub {
       die $_[0] unless $_[0]->is_success;
@@ -99,7 +101,9 @@ sub create_user ($$$;%) {
       die $_[0] unless $_[0]->is_success;
     });
   } else {
-    my $sql = 'grant all privileges on *.* to "'.$user.'"@"%" identified by "'.$password.'"';
+    my $sql = 'grant all privileges on *.* to "'.$user.'"@"%" identified';
+    $sql .= ' with "mysql_native_password"' if $args{native_password};
+    $sql .= ' by "'.$password.'"';
     $sql .= ' require subject "'.$args{tls_subject}.'"' if defined $args{tls_subject};
     return $client->query ($sql)->then (sub {
       die $_[0] unless $_[0]->is_success;

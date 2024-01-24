@@ -10,6 +10,8 @@ my $PASS1 = 'bar';
 my $USER2 = "\xFE\x80\x03a";
 my $USER2x = "??\x03a";
 my $PASS2 = "\x66\x90\xAC\xFF";
+my $USER3 = rand;
+my $PASS3 = '';
 
 test {
   my $c = shift;
@@ -356,7 +358,7 @@ test {
   }, sub {
     my $x = $_[0];
     test {
-      ok $x->is_exception;
+      ok $x->is_exception, $x;
       if ($x->packet->{error_code} == 1251) { # MySQL 8
         is $x->packet->{error_code}, 1251;
       } else {
@@ -562,6 +564,39 @@ test {
   $client->connect
       (hostname => 'unix/', port => $dsn{mysql_socket},
        character_set => 'default',
+       username => $USER3, password => $PASS3)->then (sub {
+    my @row;
+    return $client->query (q{select current_user()}, sub {
+      push @row, $_[0];
+    })->then (sub { return $row[0]->packet->{data} });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is_deeply $result, [$USER3 . '@%'];
+    } $c;
+  })->catch (sub {
+    test {
+      ok 0;
+    } $c;
+    return undef;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'empty password';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => 'unix/', port => $dsn{mysql_socket},
+       character_set => 'default',
        username => $USER2, password => $PASS2)->then (sub {
     my @row;
     return $client->query (q{select current_user()}, sub {
@@ -746,8 +781,10 @@ RUN sub {
     character_set => 'default',
   )->then (sub {
     return create_user $client, $USER1, $PASS1;
-  })->finally (sub {
+  })->then (sub {
     return create_user $client, $USER2, $PASS2;
+  })->then (sub {
+    return create_user $client, $USER3, $PASS3;
   })->finally (sub {
     return $client->disconnect;
   })->to_cv->recv;

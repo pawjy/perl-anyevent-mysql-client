@@ -6,7 +6,7 @@ use warnings FATAL => 'uninitialized';
 our $VERSION = '1.0';
 require utf8;
 use Scalar::Util qw(weaken);
-use Digest::SHA qw(sha1);
+use Digest::SHA qw(sha1 sha256);
 use AnyEvent::Handle;
 use AnyEvent::MySQL::Client::Promise;
 
@@ -96,6 +96,9 @@ sub connect ($%) {
     }
   }
 
+  ## MySQL:
+  ## <https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase.html>.
+
   ## Character set
   ## <http://dev.mysql.com/doc/refman/5.7/en/charset-connection.html>,
   ## <http://dev.mysql.com/doc/internals/en/character-set.html>.
@@ -129,6 +132,7 @@ sub connect ($%) {
       (sub { ($ok_close, $ng_close) = @_ });
   $self->{close_promise} = $promise_close;
 
+  my $is_secure_transport = (defined $args{hostname} and $args{hostname} eq 'unix/');
   $self->{handle} = eval { AnyEvent::Handle->new
       (connect => [$args{hostname}, $args{port}],
        no_delay => 1,
@@ -195,6 +199,8 @@ sub connect ($%) {
 
   my ($ok_command, $ng_command);
   my $handshake_packet;
+  my $auth_plugin;
+  my $raw_password;
   $self->{command_promise} = AnyEvent::MySQL::Client::Promise->new
       (sub { ($ok_command, $ng_command) = @_ });
   return $self->{connect_promise} = $self->_push_read_packet
@@ -251,10 +257,12 @@ sub connect ($%) {
       }
     }
     $packet->_end;
+    $auth_plugin = $packet->{auth_plugin_name} // '';
 
     my $req_caps = CLIENT_FOUND_ROWS |
         CLIENT_LONG_FLAG | CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 |
-        CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION;
+        CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION |
+        CLIENT_PLUGIN_AUTH;
     $self->{capabilities} = $req_caps |
         CLIENT_LONG_PASSWORD; # CLIENT_MYSQL in MariaDB
     #$self->{capabilities_high} = 0; # unused
@@ -310,6 +318,7 @@ sub connect ($%) {
         $_[0]->on_starttls (sub {
           if ($_[1]) {
             $tls_ok->([$packet, 2]);
+            $is_secure_transport = 1;
           } else {
             $tls_ng->(bless {is_exception => 1,
                              handshake_packet => $packet,
@@ -329,6 +338,7 @@ sub connect ($%) {
   })->then (sub {
     my ($packet, $next_id) = @{$_[0]};
     ## MariaDB: <https://mariadb.com/kb/en/connection/#sslrequest-packet>
+    ## MySQL: <https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_handshake_response.html>
     my $response = AnyEvent::MySQL::Client::SentPacket->new ($next_id);
     $response->_int4 ($self->{capabilities});
     $response->_int4 (0x1_000000); # max packet size
@@ -343,12 +353,21 @@ sub connect ($%) {
     #}
     $response->_string_null (defined $args{username} ? $args{username} : '');
 
-    ## Secure password authentication (|mysql_native_password|)
-    ## <http://dev.mysql.com/doc/internals/en/secure-password-authentication.html>.
-    my $password = defined $args{password} ? $args{password} : '';
-    if (length $password) {
-      my $sp = sha1 ($password);
-      $password = $sp ^ sha1 ($packet->{auth_plugin_data} . sha1 ($sp));
+    $raw_password = my $password = defined $args{password} ? $args{password} : '';
+    if ($auth_plugin eq 'caching_sha2_password') {
+      ## MySQL: <https://dev.mysql.com/doc/dev/mysql-server/latest/page_caching_sha2_authentication_exchanges.html>.
+      unless ($password eq '') {
+        my $nonce = $handshake_packet->{auth_plugin_data};
+        my $spass = sha256 $password;
+        $password = $spass ^ sha256 (sha256 ($spass) . $nonce);
+      }
+    } else {
+      ## Secure password authentication (|mysql_native_password|)
+      ## <http://dev.mysql.com/doc/internals/en/secure-password-authentication.html>.
+      if (length $password) {
+        my $sp = sha1 ($password);
+        $password = $sp ^ sha1 ($packet->{auth_plugin_data} . sha1 ($sp));
+      }
     }
     if ($self->{capabilities} & CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA) {
       $response->_string_lenenc ($password);
@@ -362,9 +381,9 @@ sub connect ($%) {
     if ($self->{capabilities} & CLIENT_CONNECT_WITH_DB) {
       $response->_string_null (defined $args{database} ? $args{database} : '');
     }
-    #if ($self->{capabilities} & CLIENT_PLUGIN_AUTH) {
-    #  $response->_string_null ('(auth plugin name)');
-    #}
+    if ($self->{capabilities} & CLIENT_PLUGIN_AUTH) {
+      $response->_string_null ($auth_plugin);
+    }
     #if ($self->{capabilities} & CLIENT_CONNECT_ATTRS) {
     #  # (not supported)
     #}
@@ -377,11 +396,219 @@ sub connect ($%) {
   })->then (sub {
     my $packet = $_[0];
     $self->_parse_packet ($packet);
-    if (not defined $packet->{header} or not $packet->{header} == OK_Packet) {
-      die bless {is_exception => 1,
-                 packet => $packet,
-                 message => "Failed to connect to server"}, __PACKAGE__ . '::Result';
+    my $ok;
+    if (not defined $packet->{header}) {
+      ## 0x01 AuthMoreData
+      ## 0x02 AuthNextFactor
+      ## 0xFE AuthSwitchRequest
+      ##
+      ## MySQL: AuthMoreData
+      ## <https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_auth_more_data.html>.
+      ##   (handshake)
+      ##     0x03 fast authentication success
+      ##     0x04 full authentication is needed
+      ##   (send public key)
+      ##     0x01 public key (.pem format)
+      if (${$packet->{payload_ref}} =~ /\A\x01\x03\z/) {
+        return $self->_push_read_packet
+            (label => 'next to fast authentication success',
+             timeout => $self->connection_packet_timeout)->then (sub {
+          my $packet = $_[0];
+          $self->_parse_packet ($packet);
+          my $ok;
+          if (defined $packet->{header} and
+              $packet->{header} == OK_Packet) {
+            $ok = 1;
+          }
+          if (not $ok) {
+            die bless {is_exception => 1,
+                       handshake_packet => $handshake_packet,
+                       packet => $packet,
+                       message => "Failed to connect to server (unknown response next to fast authentication success)"}, __PACKAGE__ . '::Result';
+          }
+
+          $ok_command->();
+          my $result = bless {is_success => 1,
+                              handshake_packet => $handshake_packet,
+                              packet => $packet}, __PACKAGE__ . '::Result';
+          $OnActionEnd->(state => $action_state, result => $result);
+          return $result;
+        });
+      } elsif (${$packet->{payload_ref}} =~ /\A\x01\x04\z/) {
+        ## MySQL: <https://dev.mysql.com/blog-archive/preparing-your-community-connector-for-mysql-8-part-2-sha256/>
+
+        if ($is_secure_transport) {
+          my $response = AnyEvent::MySQL::Client::SentPacket->new
+              ($packet->{sequence_id} + 1);
+          $response->_string_null ($raw_password);
+          $response->_end;
+
+          $self->_push_send_packet ($response);
+          return $self->_push_read_packet
+              (label => 'response to AuthMoreData response',
+               timeout => $self->connection_packet_timeout)->then (sub {
+            my $packet = $_[0];
+            $self->_parse_packet ($packet);
+            my $ok;
+            if (defined $packet->{header} and
+                $packet->{header} == OK_Packet) {
+              $ok = 1;
+            }
+            if (not $ok) {
+              die bless {is_exception => 1,
+                         handshake_packet => $handshake_packet,
+                         packet => $packet,
+                         message => "Failed to connect to server (unknown response to password request)"}, __PACKAGE__ . '::Result';
+            }
+            $ok_command->();
+            my $result = bless {is_success => 1,
+                                handshake_packet => $handshake_packet,
+                                packet => $packet}, __PACKAGE__ . '::Result';
+            $OnActionEnd->(state => $action_state, result => $result);
+            return $result;
+          });
+        }
+        
+        my $response = AnyEvent::MySQL::Client::SentPacket->new
+            ($packet->{sequence_id} + 1);
+        $response->_int1 (2);
+        $response->_end;
+
+        $self->_push_send_packet ($response);
+        return $self->_push_read_packet
+            (label => 'response to AuthMoreData response',
+             timeout => $self->connection_packet_timeout)->then (sub {
+          my $packet = $_[0];
+          $self->_parse_packet ($packet);
+          my $ok;
+          if (not defined $packet->{header} and
+              (substr ${$packet->{payload_ref}}, 0, 1) eq "\x01") {
+            my $pubkey_pem = substr ${$packet->{payload_ref}}, 1;
+
+            my $in = $raw_password . "\x00";
+            my $pass = '';
+            my $salt = $handshake_packet->{auth_plugin_data};
+            my $slen = length $salt;
+            for (my $i = 0; $i < length $in; $i++) {
+              $pass .= substr ($in, $i, 1) ^ substr ($salt, $i % $slen, 1);
+            }
+
+            require Crypt::OpenSSL::RSA;
+            my $rsa = Crypt::OpenSSL::RSA->new_public_key ($pubkey_pem);
+            my $epass = $rsa->encrypt ($pass);
+
+            my $response = AnyEvent::MySQL::Client::SentPacket->new
+                ($packet->{sequence_id} + 1);
+            ${$response->{payload_ref}} .= $epass;
+            $response->_end;
+
+            $self->_push_send_packet ($response);
+            return $self->_push_read_packet
+                (label => 'response to public key response',
+                 timeout => $self->connection_packet_timeout)->then (sub {
+              my $packet = $_[0];
+              $self->_parse_packet ($packet);
+              my $ok;
+              if (defined $packet->{header} and
+                  $packet->{header} == OK_Packet) {
+                $ok = 1;
+              }
+              if (not $ok) {
+                die bless {is_exception => 1,
+                           handshake_packet => $handshake_packet,
+                           packet => $packet,
+                           message => "Failed to connect to server (unknown response to encrypted password request)"}, __PACKAGE__ . '::Result';
+              }
+              $ok_command->();
+              my $result = bless {is_success => 1,
+                                  handshake_packet => $handshake_packet,
+                                  packet => $packet}, __PACKAGE__ . '::Result';
+              $OnActionEnd->(state => $action_state, result => $result);
+              return $result;
+            });
+          }
+          if (not $ok) {
+            die bless {is_exception => 1,
+                       handshake_packet => $handshake_packet,
+                       packet => $packet,
+                       message => "Failed to connect to server (unknown response to public key request)"}, __PACKAGE__ . '::Result';
+          }
+          $ok_command->();
+          my $result = bless {is_success => 1,
+                              handshake_packet => $handshake_packet,
+                              packet => $packet}, __PACKAGE__ . '::Result';
+          $OnActionEnd->(state => $action_state, result => $result);
+          return $result;
+        });
+      } elsif (${$packet->{payload_ref}} =~ /\A\xFE/) {
+        ## MySQL: AuthSwitchRequest
+        ## <https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_auth_switch_request.html>.
+        $packet->_int (1 => 'status_tag'); # 0xFE
+        $packet->_string_null ('plugin_name');
+        $packet->_string_eof ('plugin_provided_data');
+
+        if ($packet->{plugin_name} eq 'mysql_native_password' or
+            $packet->{plugin_name} eq 'sha256_password') {
+          ## <https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_auth_switch_response.html>
+
+          ## Secure password authentication (|mysql_native_password|)
+          ## <http://dev.mysql.com/doc/internals/en/secure-password-authentication.html>.
+          my $epass = '';
+          if (length $raw_password) {
+            my $sp = sha1 ($raw_password);
+            $epass = $sp ^ sha1 ($handshake_packet->{auth_plugin_data} . sha1 ($sp));
+          }
+
+          my $response = AnyEvent::MySQL::Client::SentPacket->new
+              ($packet->{sequence_id} + 1);
+          ${$response->{payload_ref}} .= $epass;
+          $response->_end;
+
+          $self->_push_send_packet ($response);
+          return $self->_push_read_packet
+              (label => 'response to AuthSwitchRequest',
+               timeout => $self->connection_packet_timeout)->then (sub {
+            my $packet = $_[0];
+            $self->_parse_packet ($packet);
+            my $ok;
+            if (defined $packet->{header} and
+                $packet->{header} == OK_Packet) {
+              $ok = 1;
+            }
+            if (not $ok) {
+              die bless {is_exception => 1,
+                         handshake_packet => $handshake_packet,
+                         packet => $packet,
+                         message => "Failed to connect to server (unknown response to AuthSwitchResponse)"}, __PACKAGE__ . '::Result';
+            }
+            $ok_command->();
+            my $result = bless {is_success => 1,
+                                handshake_packet => $handshake_packet,
+                                packet => $packet}, __PACKAGE__ . '::Result';
+            $OnActionEnd->(state => $action_state, result => $result);
+            return $result;
+          });
+        } else {
+          die bless {
+            is_exception => 1,
+            handshake_packet => $handshake_packet, packet => $packet,
+            message => "Unknown authentication plugin |$packet->{plugin_name}|",
+          }, __PACKAGE__ . '::Result';
+        }
+      }
+      ## MySQL: AuthNextFactor
+      ## <https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_auth_next_factor_request.html>.
+    } elsif ($packet->{header} == OK_Packet) {
+      $ok = 1;
     }
+
+    if (not $ok) {
+      die bless {is_exception => 1,
+                 handshake_packet => $handshake_packet,
+                 packet => $packet,
+                 message => "Failed to connect to server (unknown response)"}, __PACKAGE__ . '::Result';
+    }
+    
     $ok_command->();
     my $result = bless {is_success => 1,
                         handshake_packet => $handshake_packet,
@@ -391,6 +618,11 @@ sub connect ($%) {
   })->catch (sub {
     my $error = $_[0];
     $self->_terminate_connection;
+    if (not ref $error) {
+      $ng_command->($error);
+      return AnyEvent::MySQL::Client::Promise->reject ($error);
+    }
+    $error->{handshake_packet} = $handshake_packet;
     $ng_command->($error);
     $OnActionEnd->(state => $action_state, result => $error);
     if (defined $self->{close_promise}) {
@@ -457,7 +689,7 @@ sub quit ($) {
   })->then (sub {
     my $packet = $_[0] or return undef;
     die bless {is_exception => 1,
-               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               message => "Quit: Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
                packet => $packet}, __PACKAGE__ . '::Result'
                    unless $packet->{sequence_id} == 1;
     $self->_parse_packet ($packet);
@@ -595,10 +827,10 @@ sub query ($$;$) {
   })->then (sub {
     my $packet = $_[0];
     die bless {is_exception => 1,
-               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               message => "Query: Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
                packet => $packet}, __PACKAGE__ . '::Result'
                    unless $packet->{sequence_id} == 1;
-
+    
     ## <http://dev.mysql.com/doc/internals/en/com-query-response.html>.
     $self->_parse_packet ($packet);
     if (not defined $packet->{header}) {
@@ -708,7 +940,7 @@ sub statement_prepare ($$) {
   })->then (sub {
     my $packet = $_[0];
     die bless {is_exception => 1,
-               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               message => "Prepare: Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
                packet => $packet}, __PACKAGE__ . '::Result'
                    unless $packet->{sequence_id} == 1;
     if (0x00 == unpack 'C', substr ${$packet->{payload_ref}}, 0, 1) {
@@ -807,7 +1039,7 @@ sub statement_execute ($$;$$) {
   })->then (sub {
     my $packet = $_[0];
     die bless {is_exception => 1,
-               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               message => "Execute: Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
                packet => $packet}, __PACKAGE__ . '::Result'
                    unless $packet->{sequence_id} == 1;
     $self->_parse_packet ($packet);
@@ -932,7 +1164,7 @@ sub statement_reset ($$) {
   })->then (sub {
     my $packet = $_[0];
     die bless {is_exception => 1,
-               message => "Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
+               message => "Reset: Unexpected packet sequence ($packet->{sequence_id} where 1 expected)",
                packet => $packet}, __PACKAGE__ . '::Result'
                    unless $packet->{sequence_id} == 1;
     $self->_parse_packet ($packet);
@@ -1556,7 +1788,7 @@ sub stringify ($) {
 
 =head1 LICENSE
 
-Copyright 2014-2020 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2024 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

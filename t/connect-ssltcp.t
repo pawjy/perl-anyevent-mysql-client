@@ -37,10 +37,6 @@ my $SSL_USER = 'foo';
 my $SSL_PASS = 'bar';
 my $USER2 = rand;
 my $PASS2 = '';
-my $USER4 = rand;
-my $PASS4 = rand;
-my $USER5 = rand;
-my $PASS5 = '';
 
 my $cert_cv = AE::cv;
 warn sprintf "Wait %s seconds...\n", $wait_until_time - time;
@@ -55,7 +51,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname})->then (sub {
     my $x = $_[0];
@@ -84,7 +80,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $SSL_USER, password => $SSL_PASS,
        database => $dsn{dbname})->then (sub {
     test {
@@ -114,7 +110,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname},
        tls => {verify => 0})->then (sub {
@@ -127,14 +123,12 @@ test {
     return $client->query ('SHOW STATUS LIKE "Ssl_cipher"', sub {
       $data = $_[0]->packet->{data};
     })->then (sub {
-      my $r = $_[0];
+      my @col = map { $_->{name} } @{$_[0]->column_packets};
+      my %row;
+      for (0..$#col) {
+        $row{$col[$_]} = $data->[$_];
+      }
       test {
-        ok $r->is_success, $r;
-        my @col = map { $_->{name} } @{$r->column_packets};
-        my %row;
-        for (0..$#col) {
-          $row{$col[$_]} = $data->[$_];
-        }
         ok $row{Value};
       } $c;
     });
@@ -153,13 +147,13 @@ test {
       undef $client;
     } $c;
   });
-} wait => $cert_cv, timeout => 120, n => 4, name => 'with optional ssl';
+} wait => $cert_cv, timeout => 120, n => 3, name => 'with optional ssl';
 
 test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $dsn{user}, password => $dsn{password},
        database => $dsn{dbname},
        tls => {})->then (sub {
@@ -190,7 +184,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $SSL_USER, password => $SSL_PASS,
        database => $dsn{dbname},
        tls => {ca_file => $certs_path->child ('ca-cert.pem')->stringify,
@@ -235,7 +229,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $USER2, password => $PASS2,
        database => $dsn{dbname},
        tls => {ca_file => $certs_path->child ('ca-cert.pem')->stringify,
@@ -280,97 +274,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
-       username => $USER5, password => $PASS5,
-       database => $dsn{dbname},
-       tls => {ca_file => $certs_path->child ('ca-cert.pem')->stringify,
-               key_file => $certs_path->child ('client1-key.pem')->stringify,
-               cert_file => $certs_path->child ('client1-cert.pem')->stringify})->then (sub {
-    my $x = $_[0];
-    test {
-      ok $x->is_success;
-      ok $x->packet;
-    } $c;
-    my $data;
-    return $client->query ('SHOW STATUS LIKE "Ssl_cipher"', sub {
-      $data = $_[0]->packet->{data};
-    })->then (sub {
-      my @col = map { $_->{name} } @{$_[0]->column_packets};
-      my %row;
-      for (0..$#col) {
-        $row{$col[$_]} = $data->[$_];
-      }
-      test {
-        ok $row{Value};
-      } $c;
-    });
-  }, sub {
-    test {
-      ok 0;
-    } $c;
-  })->then (sub {
-    return $client->disconnect;
-  })->catch (sub {
-    warn $_[0];
-  })->then (sub {
-    test {
-      done $c;
-      undef $c;
-      undef $client;
-    } $c;
-  });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'empty native password';
-
-test {
-  my $c = shift;
-  my $client = AnyEvent::MySQL::Client->new;
-  $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
-       username => $USER4, password => $PASS4,
-       database => $dsn{dbname},
-       tls => {ca_file => $certs_path->child ('ca-cert.pem')->stringify,
-               key_file => $certs_path->child ('client1-key.pem')->stringify,
-               cert_file => $certs_path->child ('client1-cert.pem')->stringify})->then (sub {
-    my $x = $_[0];
-    test {
-      ok $x->is_success;
-      ok $x->packet;
-    } $c;
-    my $data;
-    return $client->query ('SHOW STATUS LIKE "Ssl_cipher"', sub {
-      $data = $_[0]->packet->{data};
-    })->then (sub {
-      my @col = map { $_->{name} } @{$_[0]->column_packets};
-      my %row;
-      for (0..$#col) {
-        $row{$col[$_]} = $data->[$_];
-      }
-      test {
-        ok $row{Value};
-      } $c;
-    });
-  }, sub {
-    test {
-      ok 0;
-    } $c;
-  })->then (sub {
-    return $client->disconnect;
-  })->catch (sub {
-    warn $_[0];
-  })->then (sub {
-    test {
-      done $c;
-      undef $c;
-      undef $client;
-    } $c;
-  });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'native password';
-
-test {
-  my $c = shift;
-  my $client = AnyEvent::MySQL::Client->new;
-  $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $SSL_USER, password => $SSL_PASS,
        database => $dsn{dbname},
        tls => {verify => 0,
@@ -416,7 +320,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $SSL_USER, password => $SSL_PASS,
        database => $dsn{dbname},
        tls => {#ca_file => $certs_path->child ('ca-cert.pem')->stringify,
@@ -449,7 +353,7 @@ test {
   my $c = shift;
   my $client = AnyEvent::MySQL::Client->new;
   $client->connect
-      (hostname => 'unix/', port => $dsn{mysql_socket},
+      (hostname => $dsn{host}, port => $dsn{port},
        username => $SSL_USER, password => $SSL_PASS,
        database => $dsn{dbname},
        tls => {ca_file => $certs_path->child ('ca-cert.pem')->stringify,
@@ -479,12 +383,12 @@ test {
 } wait => $cert_cv, timeout => 120, n => 3, name => 'with ssl client auth, wrong cert';
 
 RUN sub {
-  my $dsn = test_dsn 'hoge';
+  my $dsn = test_dsn 'hoge', tcp => 1;
   $dsn =~ s/^DBI:mysql://i;
   %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 
   {
-    my $dsn = test_dsn 'root';
+    my $dsn = test_dsn 'root', tcp => 1;
     $dsn =~ s/^DBI:mysql://i;
     %dsn = map { split /=/, $_, 2 } split /;/, $dsn;
 
@@ -496,7 +400,7 @@ RUN sub {
   } else {
     $connect{hostname} = 'unix/';
     $connect{port} = $dsn{mysql_socket};
-  }
+    }
     $client->connect (
       %connect,
       username => $dsn{user},
@@ -507,11 +411,7 @@ RUN sub {
       return create_user $client, $SSL_USER, $SSL_PASS, tls_subject => "/CN=client1.test";
     })->then (sub {
       return create_user $client, $USER2, $PASS2, tls_subject => "/CN=client1.test";
-    })->then (sub {
-      return create_user $client, $USER4, $PASS4, tls_subject => "/CN=client1.test", native_password => 1;
-    })->then (sub {
-      return create_user $client, $USER5, $PASS5, tls_subject => "/CN=client1.test", native_password => 1;
-    })->then (sub {
+    })->finally (sub {
       return $client->disconnect;
     })->to_cv->recv;
   }

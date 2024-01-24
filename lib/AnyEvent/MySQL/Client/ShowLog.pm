@@ -131,7 +131,7 @@ sub show_result ($$) {
           $self->{tls} ? 'mysql_ssl=1;' : '',
           $self->{username} // '',
           $self->{password} // '',
-          $self->{database};
+          $self->{database} // '';
       my $line = sprintf "runtime:%.2f\tdsn:%s\toperation_class:%s\toperation_method:%s",
                    ($self->{end_time} - $self->{start_time}) * 1000,
                    _ltsv_escape $dsn,
@@ -140,9 +140,9 @@ sub show_result ($$) {
       my $hs = $result->handshake_packet;
       if (defined $hs) {
         $line .= sprintf "\tserver_version:%s\tcharacter_set:%s\tauth_plugin_name:%s",
-            _ltsv_escape $hs->{server_version},
-            _ltsv_escape $hs->{character_set},
-            _ltsv_escape $hs->{auth_plugin_name};
+            _ltsv_escape ($hs->{server_version} // ''),
+            _ltsv_escape ($hs->{character_set} // ''),
+            _ltsv_escape ($hs->{auth_plugin_name} // '');
       }
       $self->carp (with_color 'bright_black', $line);
     }

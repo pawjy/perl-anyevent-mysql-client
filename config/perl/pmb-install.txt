@@ -28,3 +28,4 @@ Test::Class~0.50
 Test::More~1.302183
 Time::HiRes~1.9764
 Try::Tiny~0.30
+Crypt::OpenSSL::RSA

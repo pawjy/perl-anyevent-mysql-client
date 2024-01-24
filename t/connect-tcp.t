@@ -10,6 +10,12 @@ my $PASS1 = 'bar';
 my $USER2 = "\xFE\x80\x03a";
 my $USER2x = "??\x03a";
 my $PASS2 = "\x66\x90\xAC\xFF";
+my $USER3 = rand;
+my $PASS3 = '';
+my $USER4 = rand;
+my $PASS4 = rand;
+my $USER5 = rand;
+my $PASS5 = '';
 
 test {
   my $c = shift;
@@ -562,6 +568,111 @@ test {
   $client->connect
       (hostname => $dsn{host}, port => $dsn{port},
        character_set => 'default',
+       database => $dsn{dbname},
+       username => $USER4, password => $PASS4)->then (sub {
+    my @row;
+    return $client->query (q{select current_user()}, sub {
+      push @row, $_[0];
+    })->then (sub { return $row[0]->packet->{data} });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is_deeply $result, [$USER4 . '@%'];
+    } $c;
+  })->catch (sub {
+    my $e = $_[0];
+    test {
+      ok 0, $e;
+    } $c;
+    return undef;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'native password';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => $dsn{host}, port => $dsn{port},
+       character_set => 'default',
+       database => $dsn{dbname},
+       username => $USER5, password => $PASS5)->then (sub {
+    my @row;
+    return $client->query (q{select current_user()}, sub {
+      push @row, $_[0];
+    })->then (sub { return $row[0]->packet->{data} });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is_deeply $result, [$USER5 . '@%'];
+    } $c;
+  })->catch (sub {
+    my $e = $_[0];
+    test {
+      ok 0, $e;
+    } $c;
+    return undef;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'native password empty';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => $dsn{host}, port => $dsn{port},
+       character_set => 'default',
+       database => $dsn{dbname},
+       username => $USER3, password => $PASS3)->then (sub {
+    my @row;
+    return $client->query (q{select current_user()}, sub {
+      push @row, $_[0];
+    })->then (sub { return $row[0]->packet->{data} });
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      is_deeply $result, [$USER3 . '@%'];
+    } $c;
+  })->catch (sub {
+    my $e = $_[0];
+    test {
+      ok 0, $e;
+    } $c;
+    return undef;
+  })->then (sub {
+    return $client->disconnect;
+  })->then (sub {
+    my $result = $_[0];
+    test {
+      done $c;
+      undef $c;
+      undef $client;
+    } $c;
+  });
+} n => 1, name => 'empty password';
+
+test {
+  my $c = shift;
+  my $client = AnyEvent::MySQL::Client->new;
+  $client->connect
+      (hostname => $dsn{host}, port => $dsn{port},
+       character_set => 'default',
        username => $USER2, password => $PASS2)->then (sub {
     my @row;
     return $client->query (q{select current_user()}, sub {
@@ -746,8 +857,14 @@ RUN sub {
     character_set => 'default',
   )->then (sub {
     return create_user $client, $USER1, $PASS1;
-  })->finally (sub {
+  })->then (sub {
     return create_user $client, $USER2, $PASS2;
+  })->then (sub {
+    return create_user $client, $USER3, $PASS3;
+  })->then (sub {
+    return create_user $client, $USER4, $PASS4, native_password => 1;
+  })->then (sub {
+    return create_user $client, $USER5, $PASS5, native_password => 1;
   })->finally (sub {
     return $client->disconnect;
   })->to_cv->recv;

@@ -9,3 +9,5 @@ AnyEvent
 
 ## AnyEvent::Handle
 Net::SSLeay
+
+Crypt::OpenSSL::RSA
