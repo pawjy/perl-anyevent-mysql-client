@@ -102,7 +102,6 @@ sub create_user ($$$;%) {
     });
   } else {
     my $sql = 'grant all privileges on *.* to "'.$user.'"@"%" identified';
-    $sql .= ' with "mysql_native_password"' if $args{native_password};
     $sql .= ' by "'.$password.'"';
     $sql .= ' require subject "'.$args{tls_subject}.'"' if defined $args{tls_subject};
     return $client->query ($sql)->then (sub {
