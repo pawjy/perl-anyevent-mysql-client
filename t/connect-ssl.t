@@ -35,11 +35,11 @@ my %MyCnfArgs = (
 my %dsn;
 my $SSL_USER = 'foo';
 my $SSL_PASS = 'bar';
-my $USER2 = rand;
+my $USER2 = (substr rand, 0, 15);;
 my $PASS2 = '';
-my $USER4 = rand;
-my $PASS4 = rand;
-my $USER5 = rand;
+my $USER4 = (substr rand, 0, 15);;
+my $PASS4 = (substr rand, 0, 15);;
+my $USER5 = (substr rand, 0, 15);;
 my $PASS5 = '';
 
 my $cert_cv = AE::cv;

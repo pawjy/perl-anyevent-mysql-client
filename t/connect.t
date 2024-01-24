@@ -10,7 +10,7 @@ my $PASS1 = 'bar';
 my $USER2 = "\xFE\x80\x03a";
 my $USER2x = "??\x03a";
 my $PASS2 = "\x66\x90\xAC\xFF";
-my $USER3 = rand;
+my $USER3 = (substr rand, 0, 15);
 my $PASS3 = '';
 
 test {
