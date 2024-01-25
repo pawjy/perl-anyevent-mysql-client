@@ -119,7 +119,7 @@
             "matrix" : {
                "include" : [
                   {
-                     "env_TEST_MYSQL_VERSION" : "",
+                     "env_TEST_MYSQL_VERSION" : "mariadb",
                      "experimental" : false,
                      "perl_version" : "latest"
                   },
@@ -129,7 +129,12 @@
                      "perl_version" : "latest"
                   },
                   {
-                     "env_TEST_MYSQL_VERSION" : "",
+                     "env_TEST_MYSQL_VERSION" : "mysql8",
+                     "experimental" : false,
+                     "perl_version" : "latest"
+                  },
+                  {
+                     "env_TEST_MYSQL_VERSION" : "mariadb",
                      "experimental" : false,
                      "perl_version" : "5.14.2"
                   },
@@ -139,12 +144,22 @@
                      "perl_version" : "5.14.2"
                   },
                   {
-                     "env_TEST_MYSQL_VERSION" : "",
+                     "env_TEST_MYSQL_VERSION" : "mysql8",
+                     "experimental" : false,
+                     "perl_version" : "5.14.2"
+                  },
+                  {
+                     "env_TEST_MYSQL_VERSION" : "mariadb",
                      "experimental" : false,
                      "perl_version" : "5.12.4"
                   },
                   {
                      "env_TEST_MYSQL_VERSION" : "mysql5.6",
+                     "experimental" : false,
+                     "perl_version" : "5.12.4"
+                  },
+                  {
+                     "env_TEST_MYSQL_VERSION" : "mysql8",
                      "experimental" : false,
                      "perl_version" : "5.12.4"
                   }
