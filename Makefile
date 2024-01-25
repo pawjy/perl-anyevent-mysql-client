@@ -55,7 +55,7 @@ test-deps-modules: \
     t_deps/lib/Web/Transport/FindPort.pm t_deps/lib/Web/Transport/_Defs.pm
 
 clean-test-deps:
-	rm t_deps/lib/Web/Transport/*.pm
+	rm -fr t_deps/lib/Web/Transport/*.pm
 
 t_deps/lib/Web/Transport/FindPort.pm:
 	mkdir -p t_deps/lib/Web/Transport
