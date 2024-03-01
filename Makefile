@@ -50,6 +50,9 @@ test: test-deps test-main
 
 test-deps: deps test-deps-modules
 	docker pull mariadb &
+	docker pull mysql/mysql-server &
+	docker pull mysql/mysql-server:8.0 &
+	docker pull mysql/mysql-server:5.6 &
 
 test-deps-modules: \
     t_deps/lib/Web/Transport/FindPort.pm t_deps/lib/Web/Transport/_Defs.pm
