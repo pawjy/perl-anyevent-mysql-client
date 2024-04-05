@@ -289,10 +289,6 @@ sub connect ($%) {
     if (defined $args{tls}) {
       my $ctx_args = {%{$args{tls}}};
       $ctx_args->{verify} //= 1;
-      ## AnyEvent (7.16 Fri Jul 19 18:00:21 CEST 2019) changed default
-      ## |dh| value from |schmorp1539| to |ffdhe3072| but some
-      ## environments we support do not have it :-<
-      $ctx_args->{dh} //= 'schmorp1539';
       
       ## MySQL: <http://dev.mysql.com/doc/internals/en/connection-phase-packets.html#packet-Protocol::SSLRequest>
       ## MariaDB: <https://mariadb.com/kb/en/connection/#sslrequest-packet>
