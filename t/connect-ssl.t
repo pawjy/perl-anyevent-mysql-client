@@ -6,7 +6,7 @@ use Tests;
 use Test::Certificates;
 
 Promise->resolve->then (sub {
-  return Test::Certificates->wait_create_cert_p ({host => 'server'});
+  return Test::Certificates->wait_create_cert_p ({host => 'server', intermediate => ($ENV{TEST_MYSQL_VERSION} // '') eq 'mysql5.6'});
 })->then (sub {
   return Test::Certificates->wait_create_cert_p ({host => 'client1'});
 })->then (sub {
