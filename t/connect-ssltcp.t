@@ -3,49 +3,21 @@ use warnings;
 use Path::Tiny;
 use lib glob path (__FILE__)->parent->parent->child ('t_deps/lib');
 use Tests;
+use Test::Certificates;
 
-my $ReuseCerts = $ENV{REUSE_CERTS};
-my $generate_certs_path = path (__FILE__)->parent->parent
-    ->child ('t_deps/modules/rdb-utils/bin/generate-certs-for-tests.pl');
-my $temp_dir = File::Temp->newdir;
-my $certs_path = path ($temp_dir->dirname);
-my $wait_until_time = time;
-if ($ReuseCerts) {
-  $certs_path = path (__FILE__)->parent->parent->child ('local/test-certs');
-  unless (-f $certs_path->child ('client2-cert.pem') and
-          $certs_path->child ('client2-cert.pem')->stat->[9] < time + 24*3600) {
-    system ('perl', $generate_certs_path, $certs_path, 'server', 'client1', 'client2') == 0 or die $?;
-    my $cert_time = time;
-    $wait_until_time = $cert_time + 60 - [gmtime $cert_time]->[0];
-  }
-} else {
-  system ('perl', $generate_certs_path, $certs_path, 'server', 'client1', 'client2') == 0 or die $?;
-  my $cert_time = time;
-  $wait_until_time = $cert_time + 60 - [gmtime $cert_time]->[0];
-  chmod 0777, $certs_path;
-}
-$certs_path = $certs_path->absolute;
-
-my %MyCnfArgs = (
-  'ssl-ca' => $certs_path->child ('ca-cert.pem')->stringify,
-  'ssl-cert' => $certs_path->child ('server-cert.pem')->stringify,
-  'ssl-key' => $certs_path->child ('server-key-pkcs1.pem')->stringify,
-);
+Promise->resolve->then (sub {
+  return Test::Certificates->wait_create_cert_p ({host => 'server'});
+})->then (sub {
+  return Test::Certificates->wait_create_cert_p ({host => 'client1'});
+})->then (sub {
+  return Test::Certificates->wait_create_cert_p ({host => 'client2'});
+})->to_cv->recv;
 
 my %dsn;
 my $SSL_USER = 'foo';
 my $SSL_PASS = 'bar';
 my $USER2 = (substr rand, 0, 15);
 my $PASS2 = '';
-
-my $cert_cv = AE::cv;
-warn sprintf "Wait %s seconds...\n", $wait_until_time - time;
-my $timer; $timer = AE::timer $wait_until_time - time, 0, sub {
-  #warn "mysql -S $dsn{mysql_socket} -ufoo -pbar --ssl-ca=@{[$certs_path->child ('ca-cert.pem')]} --ssl-cert=@{[$certs_path->child ('client1-cert.pem')]} --ssl-key=@{[$certs_path->child ('client1-key-pkcs1.pem')]}";
-  #warn $dsn;
-  undef $timer;
-  $cert_cv->send;
-};
 
 test {
   my $c = shift;
@@ -104,7 +76,7 @@ test {
       undef $client;
     } $c;
   });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'ssl-only user, no ssl';
+} timeout => 120, n => 3, name => 'ssl-only user, no ssl';
 
 test {
   my $c = shift;
@@ -147,7 +119,7 @@ test {
       undef $client;
     } $c;
   });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'with optional ssl';
+} timeout => 120, n => 3, name => 'with optional ssl';
 
 test {
   my $c = shift;
@@ -178,7 +150,7 @@ test {
       undef $client;
     } $c;
   });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'with optional ssl, verification error';
+} timeout => 120, n => 3, name => 'with optional ssl, verification error';
 
 test {
   my $c = shift;
@@ -187,9 +159,10 @@ test {
       (hostname => $dsn{host}, port => $dsn{port},
        username => $SSL_USER, password => $SSL_PASS,
        database => $dsn{dbname},
-       tls => {ca_file => $certs_path->child ('ca-cert.pem')->stringify,
-               key_file => $certs_path->child ('client1-key.pem')->stringify,
-               cert_file => $certs_path->child ('client1-cert.pem')->stringify})->then (sub {
+       tls => {ca_file => Test::Certificates->ca_path ('cert.pem')->stringify,
+               key_file => Test::Certificates->cert_path ('key.pem', {host => 'client1'})->stringify,
+               cert_file => Test::Certificates->cert_path ('cert-chained.pem', {host => 'client1'})->stringify,
+             })->then (sub {
     my $x = $_[0];
     test {
       ok $x->is_success;
@@ -223,7 +196,7 @@ test {
       undef $client;
     } $c;
   });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'with ssl client auth';
+} timeout => 120, n => 3, name => 'with ssl client auth';
 
 test {
   my $c = shift;
@@ -232,9 +205,10 @@ test {
       (hostname => $dsn{host}, port => $dsn{port},
        username => $USER2, password => $PASS2,
        database => $dsn{dbname},
-       tls => {ca_file => $certs_path->child ('ca-cert.pem')->stringify,
-               key_file => $certs_path->child ('client1-key.pem')->stringify,
-               cert_file => $certs_path->child ('client1-cert.pem')->stringify})->then (sub {
+       tls => {ca_file => Test::Certificates->ca_path ('cert.pem')->stringify,
+               key_file => Test::Certificates->cert_path ('key.pem', {host => 'client1'})->stringify,
+               cert_file => Test::Certificates->cert_path ('cert-chained.pem', {host => 'client1'})->stringify,
+             })->then (sub {
     my $x = $_[0];
     test {
       ok $x->is_success;
@@ -268,7 +242,7 @@ test {
       undef $client;
     } $c;
   });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'empty password';
+} timeout => 120, n => 3, name => 'empty password';
 
 test {
   my $c = shift;
@@ -278,9 +252,10 @@ test {
        username => $SSL_USER, password => $SSL_PASS,
        database => $dsn{dbname},
        tls => {verify => 0,
-               #ca_file => $certs_path->child ('ca-cert.pem')->stringify,
-               key_file => $certs_path->child ('client1-key.pem')->stringify,
-               cert_file => $certs_path->child ('client1-cert.pem')->stringify})->then (sub {
+               #ca_file => Test::Certificates->ca_path ('cert.pem')->stringify,
+               key_file => Test::Certificates->cert_path ('key.pem', {host => 'client1'})->stringify,
+               cert_file => Test::Certificates->cert_path ('cert-chained.pem', {host => 'client1'})->stringify,
+             })->then (sub {
     my $x = $_[0];
     test {
       ok $x->is_success;
@@ -314,7 +289,7 @@ test {
       undef $client;
     } $c;
   });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'with ssl client auth, no verification';
+} timeout => 120, n => 3, name => 'with ssl client auth, no verification';
 
 test {
   my $c = shift;
@@ -323,9 +298,10 @@ test {
       (hostname => $dsn{host}, port => $dsn{port},
        username => $SSL_USER, password => $SSL_PASS,
        database => $dsn{dbname},
-       tls => {#ca_file => $certs_path->child ('ca-cert.pem')->stringify,
-               key_file => $certs_path->child ('client1-key.pem')->stringify,
-               cert_file => $certs_path->child ('client1-cert.pem')->stringify})->then (sub {
+       tls => {#ca_file => Test::Certificates->ca_path ('cert.pem')->stringify,
+               key_file => Test::Certificates->cert_path ('key.pem', {host => 'client1'})->stringify,
+               cert_file => Test::Certificates->cert_path ('cert-chained.pem', {host => 'client1'})->stringify,
+             })->then (sub {
     test {
       ok 0;
     } $c;
@@ -347,7 +323,7 @@ test {
       undef $client;
     } $c;
   });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'with ssl client auth, verification error';
+} timeout => 120, n => 3, name => 'with ssl client auth, verification error';
 
 test {
   my $c = shift;
@@ -356,9 +332,10 @@ test {
       (hostname => $dsn{host}, port => $dsn{port},
        username => $SSL_USER, password => $SSL_PASS,
        database => $dsn{dbname},
-       tls => {ca_file => $certs_path->child ('ca-cert.pem')->stringify,
-               key_file => $certs_path->child ('client2-key.pem')->stringify,
-               cert_file => $certs_path->child ('client2-cert.pem')->stringify})->then (sub {
+       tls => {ca_file => Test::Certificates->ca_path ('cert.pem')->stringify,
+               key_file => Test::Certificates->cert_path ('key.pem', {host => 'client2'})->stringify,
+               cert_file => Test::Certificates->cert_path ('cert-chained.pem', {host => 'client2'})->stringify,
+             })->then (sub {
     test {
       ok 0;
     } $c;
@@ -380,7 +357,7 @@ test {
       undef $client;
     } $c;
   });
-} wait => $cert_cv, timeout => 120, n => 3, name => 'with ssl client auth, wrong cert';
+} timeout => 120, n => 3, name => 'with ssl client auth, wrong cert';
 
 RUN sub {
   my $dsn = test_dsn 'hoge', tcp => 1;
@@ -408,16 +385,20 @@ RUN sub {
       database => 'mysql',
       character_set => 'default',
     )->then (sub {
-      return create_user $client, $SSL_USER, $SSL_PASS, tls_subject => "/CN=client1.test";
+      return create_user $client, $SSL_USER, $SSL_PASS, tls_subject => "/CN=client1";
     })->then (sub {
-      return create_user $client, $USER2, $PASS2, tls_subject => "/CN=client1.test";
+      return create_user $client, $USER2, $PASS2, tls_subject => "/CN=client1";
     })->finally (sub {
       return $client->disconnect;
     })->to_cv->recv;
   }
 }, {
-  path => $certs_path,
-  mycnf => \%MyCnfArgs,
+  mycnf => {
+    'ssl-ca' => Test::Certificates->ca_path ('cert.pem')->stringify,
+    'ssl-cert' => Test::Certificates->cert_path ('cert-chained.pem', {host => 'server'})->stringify,
+    'ssl-key' => Test::Certificates->cert_path ('key.pem', {host => 'server'})->stringify,
+  },
+  path => Test::Certificates->cert_path ('')->parent,
 };
 
 =head1 LICENSE
