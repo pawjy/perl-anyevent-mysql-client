@@ -1,11 +1,11 @@
 AnyEvent~7.17
 AnyEvent::FileLock~0.06
-AnyEvent::Util
+AnyEvent::Socket
 Canary::Stability~2013
 Carp~1.50
 Class::Accessor::Lite~0.08
 Crypt::OpenSSL::RSA~0.33
-Crypt::OpenSSL::Random~0.15
+Crypt::OpenSSL::Random~0.16
 Cwd~3.75
 DBI~1.643
 DBIx::RewriteDSN~0.05
