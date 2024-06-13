@@ -1,10 +1,11 @@
 AnyEvent~7.17
 AnyEvent::FileLock~0.06
+AnyEvent::Util
 Canary::Stability~2013
 Carp~1.50
 Class::Accessor::Lite~0.08
 Crypt::OpenSSL::RSA~0.33
-Crypt::OpenSSL::Random~0.16
+Crypt::OpenSSL::Random~0.17
 Cwd~3.75
 DBI~1.643
 DBIx::RewriteDSN~0.05
@@ -28,8 +29,8 @@ Path::Tiny~0.146
 Scalar::Util~1.63
 Socket~2.038
 Term::ANSIColor~5.01
-Test::Builder~1.302199
 Test::Class~0.52
+Test::More~1.302199
 Test::mysqld~1.0030
 Time::HiRes~1.9764
 Try::Tiny~0.31
