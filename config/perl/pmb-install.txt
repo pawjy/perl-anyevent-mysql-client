@@ -28,10 +28,10 @@ Module::Runtime~0.016
 Net::SSLeay~1.94
 Path::Class~0.37
 Path::Tiny~0.146
-Scalar::Util~1.64
+Scalar::Util~1.65
 Socket~2.038
 Term::ANSIColor~5.01
-Term::Table~0.020
+Term::Table~0.022
 Test::Class~0.52
 Test::More~1.302200
 Test::mysqld~1.0030
