@@ -8,7 +8,7 @@ Class::Accessor::Lite~0.08
 Crypt::OpenSSL::RSA~0.33
 Crypt::OpenSSL::Random~0.17
 Cwd~3.75
-DBI~1.643
+DBI~1.644
 DBIx::RewriteDSN~0.05
 Data::Dumper~2.183
 Digest::SHA~6.04
@@ -32,8 +32,8 @@ Scalar::Util~1.65
 Socket~2.038
 Term::ANSIColor~5.01
 Term::Table~0.022
-Test::Builder~1.302201
 Test::Class~0.52
+Test::More~1.302201
 Test::mysqld~1.0030
 Time::HiRes~1.9764
 Try::Tiny~0.32
