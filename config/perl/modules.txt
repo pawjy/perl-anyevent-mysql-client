@@ -3,6 +3,8 @@ Carp
 Digest::SHA
 Scalar::Util
 
+Net::SSLeay
+
 ## Promise
 Carp
 AnyEvent
@@ -10,4 +12,3 @@ AnyEvent
 ## AnyEvent::Handle
 Net::SSLeay
 
-Crypt::OpenSSL::RSA
