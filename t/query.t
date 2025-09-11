@@ -295,9 +295,10 @@ test {
   })->then (sub {
     my $result = $_[0];
     test {
-      if ($Tests::ServerData->{mysql_version} eq 'mysql8') {
+      if ($Tests::ServerData->{mysql_version} eq 'mysql8' or
+          $Tests::ServerData->{mysql_version} eq 'mariadb') { # newer vesions
         is $result, "\xE4\xBD\x8D", "got 2";
-      } else {
+      } else { # mysql56, older mariadb
         is $result, encode_web_utf8 "\xE4\xBD\x8D", "got 2";
       }
     } $c;
@@ -322,9 +323,10 @@ test {
   })->then (sub {
     my $result = $_[0];
     test {
-      if ($Tests::ServerData->{mysql_version} eq 'mysql8') {
+      if ($Tests::ServerData->{mysql_version} eq 'mysql8' or
+          $Tests::ServerData->{mysql_version} eq 'mariadb') { # newer vesions
         is $result, "?", "got 3";
-      } else {
+      } else { # mysql56, older mariadb
         is $result, "\xE4\xBD\x8D", "got 3";
       }
     } $c;

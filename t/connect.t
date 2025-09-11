@@ -637,10 +637,11 @@ test {
        username => $USER2, password => $PASS2,
        database => $dsn{dbname})->then (sub {
     test {
-      if ($Tests::ServerData->{mysql_version} eq 'mysql8') {
+      if ($Tests::ServerData->{mysql_version} eq 'mysql8' or
+          $Tests::ServerData->{mysql_version} eq 'mariadb') { # newer vesions
         ok 1;
         ok 1;
-      } else {
+      } else { # mysql56, older mariadb
         ok 0;
       }
     } $c;
