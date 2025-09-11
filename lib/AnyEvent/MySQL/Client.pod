@@ -430,8 +430,7 @@ not use blocking I/O and they should return as soon as possible.
 The module requires Perl 5.12 or later and L<AnyEvent>.  It also
 requires some core modules.
 
-For MySQL/MariaDB protocol over TLS and for MySQL 8 servers,
-L<Net::SSLeay> is also required.
+For MySQL 8 servers, L<Crypt::OpenSSL::RSA> is also required.
 
 =head1 SPECIFICATION
 
@@ -458,7 +457,7 @@ Thanks to suzak and hatz48.
 
 =head1 LICENSE
 
-Copyright 2014-2025 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2024 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.

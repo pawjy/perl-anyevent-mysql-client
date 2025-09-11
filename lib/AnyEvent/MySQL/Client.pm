@@ -489,24 +489,9 @@ sub connect ($%) {
               $pass .= substr ($in, $i, 1) ^ substr ($salt, $i % $slen, 1);
             }
 
-            my $epass;
-            {
-              require Net::SSLeay;
-              my $pub = Net::SSLeay::PEM_read_bio_PUBKEY
-                  (Net::SSLeay::BIO_new_mem_buf ($pubkey_pem, length $pubkey_pem));
-              my $rsa = Net::SSLeay::EVP_PKEY_get1_RSA ($pub);
-
-              my $buf = "\0" x Net::SSLeay::RSA_size ($rsa);
-              my $len = Net::SSLeay::RSA_public_encrypt
-                  (length ($pass), $pass, $buf, $rsa,
-                   &Net::SSLeay::RSA_PKCS1_PADDING);
-              die "RSA encryption failed" if $len == -1;
-
-              $epass = substr ($buf, 0, $len);
-              
-              Net::SSLeay::RSA_free ($rsa);
-              Net::SSLeay::EVP_PKEY_free ($pub);
-            }
+            require Crypt::OpenSSL::RSA;
+            my $rsa = Crypt::OpenSSL::RSA->new_public_key ($pubkey_pem);
+            my $epass = $rsa->encrypt ($pass);
 
             my $response = AnyEvent::MySQL::Client::SentPacket->new
                 ($packet->{sequence_id} + 1);
@@ -1799,7 +1784,7 @@ sub stringify ($) {
 
 =head1 LICENSE
 
-Copyright 2014-2025 Wakaba <wakaba@suikawiki.org>.
+Copyright 2014-2024 Wakaba <wakaba@suikawiki.org>.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
