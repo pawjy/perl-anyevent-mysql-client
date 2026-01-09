@@ -1,7 +1,7 @@
 AnyEvent~7.17
 AnyEvent::AIO~1.1
 AnyEvent::FileLock~0.06
-AnyEvent::IO
+AnyEvent::Handle
 Canary::Stability~2013
 Carp~1.50
 Class::Accessor::Lite~0.08
@@ -31,8 +31,8 @@ Scalar::Util~1.70
 Socket~2.040
 Term::ANSIColor~5.01
 Term::Table~0.028
-Test::Builder~1.302219
 Test::Class~0.52
+Test::More~1.302219
 Test::mysqld~1.0030
 Time::HiRes~1.9764
 Try::Tiny~0.32
