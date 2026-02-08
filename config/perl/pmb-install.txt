@@ -31,8 +31,8 @@ Scalar::Util~1.70
 Socket~2.040
 Term::ANSIColor~5.01
 Term::Table~0.028
-Test::Builder~1.302219
 Test::Class~0.52
+Test::More~1.302219
 Test::mysqld~1.0030
 Time::HiRes~1.9764
 Try::Tiny~0.32
