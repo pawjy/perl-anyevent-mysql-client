@@ -8,7 +8,7 @@ Crypt::OpenSSL::Bignum~0.09
 Crypt::OpenSSL::RSA~0.41
 Crypt::OpenSSL::Random~0.17
 Cwd~3.75
-DBI~1.648
+DBI~1.649
 DBIx::RewriteDSN~0.05
 Data::Dumper~2.183
 Digest::SHA~6.04
@@ -31,8 +31,8 @@ Scalar::Util~1.70
 Socket~2.041
 Term::ANSIColor~5.01
 Term::Table~0.028
-Test::Builder~1.302222
 Test::Class~0.52
+Test::More~1.302222
 Test::mysqld~1.0030
 Time::HiRes~1.9764
 Try::Tiny~0.32
