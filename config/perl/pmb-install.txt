@@ -1,6 +1,7 @@
 AnyEvent~7.17
 AnyEvent::AIO~1.1
 AnyEvent::FileLock~0.06
+AnyEvent::Socket
 Canary::Stability~2013
 Carp~1.50
 Class::Accessor::Lite~0.08
