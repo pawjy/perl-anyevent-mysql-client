@@ -8,7 +8,7 @@ Crypt::OpenSSL::Bignum~0.09
 Crypt::OpenSSL::RSA~0.41
 Crypt::OpenSSL::Random~0.17
 Cwd~3.75
-DBI~1.649
+DBI~1.650
 DBIx::RewriteDSN~0.05
 Data::Dumper~2.183
 Digest::SHA~6.04
