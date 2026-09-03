@@ -32,7 +32,7 @@ Socket~2.043
 Term::ANSIColor~5.01
 Term::Table~0.028
 Test::Class~0.52
-Test::More~1.302224
+Test::More~1.302225
 Test::mysqld~1.0030
 Time::HiRes~1.9764
 Try::Tiny~0.32
